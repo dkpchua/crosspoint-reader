@@ -57,6 +57,9 @@ void logPrintf(const char* level, const char* origin, const char* format, ...);
 
 std::string getLastLogs();
 void clearLastLogs();
+// Clamps logHead into range without wiping messages — safe to call on panic
+// reboots where the panic occurred before begin() ever had a chance to run.
+void sanitizeLogHead();
 
 class MySerialImpl : public Print {
  public:
