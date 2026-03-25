@@ -1,6 +1,8 @@
 #pragma once
 #include <functional>
 #include <memory>
+#include <optional>
+#include <string>
 #include <vector>
 
 #include "Epub.h"
@@ -18,7 +20,7 @@ class Section {
 
   void writeSectionFileHeader(int fontId, float lineCompression, bool extraParagraphSpacing, uint8_t paragraphAlignment,
                               uint16_t viewportWidth, uint16_t viewportHeight, bool hyphenationEnabled,
-                              bool embeddedStyle);
+                              bool embeddedStyle, uint8_t imageRendering);
   uint32_t onPageComplete(std::unique_ptr<Page> page);
 
  public:
@@ -32,10 +34,14 @@ class Section {
         filePath(epub->getCachePath() + "/sections/" + std::to_string(spineIndex) + ".bin") {}
   ~Section() = default;
   bool loadSectionFile(int fontId, float lineCompression, bool extraParagraphSpacing, uint8_t paragraphAlignment,
-                       uint16_t viewportWidth, uint16_t viewportHeight, bool hyphenationEnabled, bool embeddedStyle);
+                       uint16_t viewportWidth, uint16_t viewportHeight, bool hyphenationEnabled, bool embeddedStyle,
+                       uint8_t imageRendering);
   bool clearCache();
   bool createSectionFile(int fontId, float lineCompression, bool extraParagraphSpacing, uint8_t paragraphAlignment,
                          uint16_t viewportWidth, uint16_t viewportHeight, bool hyphenationEnabled, bool embeddedStyle,
-                         const std::function<void()>& popupFn = nullptr);
+                         uint8_t imageRendering, const std::function<void()>& popupFn = nullptr);
   std::unique_ptr<Page> loadPageFromSectionFile();
+
+  // Look up the page number for an anchor id from the section cache file.
+  std::optional<uint16_t> getPageForAnchor(const std::string& anchor) const;
 };
