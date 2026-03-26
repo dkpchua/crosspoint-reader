@@ -24,8 +24,7 @@ bool mapIanaTimezone(const std::string& tz, uint8_t& outSetting) {
     outSetting = TZ::TZ_UTC;
     return true;
   }
-  if (tz == "Europe/London" || tz == "Europe/Guernsey" || tz == "Europe/Isle_of_Man" ||
-      tz == "Europe/Jersey") {
+  if (tz == "Europe/London" || tz == "Europe/Guernsey" || tz == "Europe/Isle_of_Man" || tz == "Europe/Jersey") {
     outSetting = TZ::TZ_UTC;
     return true;
   }
@@ -274,8 +273,7 @@ void DetectTimezoneActivity::render(RenderLock&&) {
   }
 
   if (state == SUCCESS) {
-    renderer.drawCenteredText(UI_10_FONT_ID, pageHeight / 2 - 20, tr(STR_TIMEZONE_DETECTED), true,
-                              EpdFontFamily::BOLD);
+    renderer.drawCenteredText(UI_10_FONT_ID, pageHeight / 2 - 20, tr(STR_TIMEZONE_DETECTED), true, EpdFontFamily::BOLD);
 
     if (!detectedTimezone.empty()) {
       renderer.drawCenteredText(UI_10_FONT_ID, pageHeight / 2 + 5, detectedTimezone.c_str());
@@ -289,8 +287,7 @@ void DetectTimezoneActivity::render(RenderLock&&) {
   }
 
   if (state == FAILED) {
-    renderer.drawCenteredText(UI_10_FONT_ID, pageHeight / 2, tr(STR_TIMEZONE_DETECT_FAILED), true,
-                              EpdFontFamily::BOLD);
+    renderer.drawCenteredText(UI_10_FONT_ID, pageHeight / 2, tr(STR_TIMEZONE_DETECT_FAILED), true, EpdFontFamily::BOLD);
 
     const auto labels = mappedInput.mapLabels(tr(STR_BACK), "", "", "");
     GUI.drawButtonHints(renderer, labels.btn1, labels.btn2, labels.btn3, labels.btn4);
