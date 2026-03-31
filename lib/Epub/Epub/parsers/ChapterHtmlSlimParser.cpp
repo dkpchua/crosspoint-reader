@@ -554,10 +554,8 @@ void XMLCALL ChapterHtmlSlimParser::startElement(void* userData, const XML_Char*
     }
   }
 
-  // Track ul/ol nesting so li markers can be numbered or bulleted accordingly
   if (strcmp(name, "ul") == 0 || strcmp(name, "ol") == 0) {
-    self->listStack.push_back({self->depth, strcmp(name, "ol") == 0, 0});
-    // fall through to depth increment
+    self->listStack.push_back({self->depth, name[0] == 'o', 0});
   }
 
   const float emSize = static_cast<float>(self->renderer.getFontAscenderSize(self->fontId));
@@ -592,7 +590,7 @@ void XMLCALL ChapterHtmlSlimParser::startElement(void* userData, const XML_Char*
           self->listStack.back().counter += 1;
           snprintf(marker, sizeof(marker), "%d.", self->listStack.back().counter);
         } else {
-          strncpy(marker, "\xe2\x80\xa2", sizeof(marker));
+          strcpy(marker, "\xe2\x80\xa2");
         }
         self->currentTextBlock->addWord(marker, EpdFontFamily::REGULAR);
       }

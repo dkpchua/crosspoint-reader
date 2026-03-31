@@ -70,7 +70,6 @@ class ChapterHtmlSlimParser {
   int tableRowIndex = 0;
   int tableColIndex = 0;
 
-  // List nesting tracking for ul/ol markers
   struct ListEntry {
     int depth;
     bool isOrdered;
