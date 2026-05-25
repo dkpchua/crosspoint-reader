@@ -17,12 +17,14 @@ hanging, and so we enter the stricter phases with a clean slate.
 
 * **RTL support PRs** that are currently open. Reviewing, iterating, and merging the in-flight right-to-left work.
 * **Dictionary PR** that is currently open. Reviewing and merging the offline dictionary lookup work.
+* **Bookmarks** feature. Finishing the in-flight bookmarks work so users have first-class navigation markers in
+  EPUBs.
 * **Transparent sleep screens** (potential). If a clean implementation lands during this phase, it is in. If it
   stalls or balloons in scope, it moves out and is not picked back up under the stricter phases.
 
 **Exit criteria for Phase 0:**
 
-* The RTL and dictionary PRs are either merged or explicitly closed with a reason.
+* The RTL, dictionary, and bookmarks PRs are either merged or explicitly closed with a reason.
 * Transparent sleep screens are either merged or shelved.
 * No other "legacy scope" features are accepted during this phase. New work that does not fit the post-Phase-0 scope
   should wait.
