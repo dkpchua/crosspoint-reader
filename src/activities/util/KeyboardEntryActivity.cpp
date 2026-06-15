@@ -337,13 +337,24 @@ void KeyboardEntryActivity::loop() {
     }
   }
 
-  // A tap selects the key and presses it in one gesture. Encoded id = row*100+col
-  // (bottom function row = getContentRowCount()). Skipped in cursor mode, where a
-  // tap on a key would be ambiguous with cursor editing.
+  // A tap selects the key and presses it. Encoded id = row*100+col (bottom function
+  // row = getContentRowCount()). A touch-and-hold inserts the alternate character
+  // (numbers/symbols on a letter), mirroring the button long-press — wasItemLongPressed
+  // is checked first since it's a subset of wasItemTapped's releases. Skipped in
+  // cursor mode, where a tap on a key would be ambiguous with cursor editing.
   int tappedKey = -1;
   if (!cursorMode && mappedInput.wasItemTapped(tappedKey)) {
     selectedRow = tappedKey / 100;
     selectedCol = tappedKey % 100;
+    int longKey = -1;
+    if (mappedInput.wasItemLongPressed(longKey)) {
+      const char alt = getAlternativeChar();
+      if (alt != '\0') {
+        insertChar(alt);
+        requestUpdate();
+        return;
+      }
+    }
     if (handleKeyPress()) {
       requestUpdate();
     }

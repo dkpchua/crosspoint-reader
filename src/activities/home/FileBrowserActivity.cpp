@@ -206,6 +206,14 @@ void FileBrowserActivity::loop() {
   const int pathReserved = renderer.getLineHeight(SMALL_FONT_ID) + UITheme::getInstance().getMetrics().verticalSpacing;
   const int pageItems = UITheme::getNumberOfItemsPerPage(renderer, true, false, true, false, pathReserved);
 
+  // Touch-down moves the selector to the pressed entry (shows selected state); release
+  // opens it below.
+  int downId = -1;
+  if (mappedInput.wasItemTouchedDown(downId) && downId >= 0 && downId < static_cast<int>(files.size())) {
+    selectorIndex = downId;
+    requestUpdate();
+  }
+
   // A tap opens the tapped entry (held-time is 0 on a tap, so it takes the short-press
   // open path below, never the long-press delete).
   int tappedId = -1;

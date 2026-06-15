@@ -77,6 +77,14 @@ class HalGPIO {
   // primitive; see MappedInputManager for the top-left = Back mapping.)
   bool wasTouchTap(float& nx, float& ny) const;
 
+  // Press-edge of a touch: true on touch-down with the down position normalized
+  // 0..1 (panel native). For showing the pressed/selected element before release.
+  bool wasTouchDown(float& nx, float& ny) const;
+
+  // Duration (ms) of the last touch contact, latched on release. Valid on the
+  // release frame (alongside wasTouchTap). For tap-vs-long-press decisions.
+  unsigned long lastTouchHeldMs() const;
+
   // True if a touch controller is present/active (runtime gate; false on the C3).
   bool hasTouch() const;
 

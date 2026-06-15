@@ -82,6 +82,24 @@ bool MappedInputManager::wasItemTapped(int& id) const {
   return TouchRegistry::getInstance().hitTest(lx, ly, TouchRegistry::Item, id);
 }
 
+bool MappedInputManager::wasItemTouchedDown(int& id) const {
+  float nx = 0.0f, ny = 0.0f;
+  if (!gpio.wasTouchDown(nx, ny)) return false;
+  int lx = 0, ly = 0;
+  renderer.tapToLogical(nx, ny, lx, ly);
+  return TouchRegistry::getInstance().hitTest(lx, ly, TouchRegistry::Item, id);
+}
+
+bool MappedInputManager::wasItemLongPressed(int& id) const {
+  static constexpr unsigned long TOUCH_LONG_PRESS_MS = 500;
+  float nx = 0.0f, ny = 0.0f;
+  if (!gpio.wasTouchTap(nx, ny)) return false;  // release frame
+  if (gpio.lastTouchHeldMs() < TOUCH_LONG_PRESS_MS) return false;
+  int lx = 0, ly = 0;
+  renderer.tapToLogical(nx, ny, lx, ly);
+  return TouchRegistry::getInstance().hitTest(lx, ly, TouchRegistry::Item, id);
+}
+
 bool MappedInputManager::wasTabTapped(int& id) const {
   float nx = 0.0f, ny = 0.0f;
   if (!gpio.wasTouchTap(nx, ny)) return false;

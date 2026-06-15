@@ -31,6 +31,12 @@ void EpubReaderChapterSelectionActivity::loop() {
   const int pageItems = UITheme::getInstance().getNumberOfItemsPerPage(renderer, true, false, true, false);
   const int totalItems = getTotalItems();
 
+  int downId = -1;
+  if (mappedInput.wasItemTouchedDown(downId) && downId >= 0 && downId < totalItems) {
+    selectorIndex = downId;
+    requestUpdate();
+  }
+
   int tappedId = -1;
   const bool tapped = mappedInput.wasItemTapped(tappedId);
   if (tapped && tappedId >= 0 && tappedId < totalItems) selectorIndex = tappedId;

@@ -245,6 +245,10 @@ unsigned long HalGPIO::getPowerButtonHeldTime() const { return inputMgr.getPower
 
 bool HalGPIO::wasTouchTap(float& nx, float& ny) const { return inputMgr.wasTouchTap(nx, ny); }
 
+bool HalGPIO::wasTouchDown(float& nx, float& ny) const { return inputMgr.wasTouchPressedAt(nx, ny); }
+
+unsigned long HalGPIO::lastTouchHeldMs() const { return inputMgr.lastTouchHeldMs(); }
+
 bool HalGPIO::hasTouch() const { return inputMgr.hasTouch(); }
 
 void HalGPIO::startDeepSleep() {

@@ -31,6 +31,15 @@ class MappedInputManager {
   // element's id. Activities treat the id as "select + activate". False on
   // non-touch devices or when the tap missed every target.
   bool wasItemTapped(int& id) const;
+  // Press-edge analogue of wasItemTapped: fires on touch-DOWN over an item, so the
+  // activity can move its selection to that item (showing the selected state) before
+  // release. Release still activates via wasItemTapped. Mirrors button nav (move
+  // selection, then confirm).
+  bool wasItemTouchedDown(int& id) const;
+  // Long-press variant of wasItemTapped: true on release of a touch over an item
+  // held past the long-press threshold (a subset of wasItemTapped's releases, so
+  // check this first). Lets a screen distinguish tap vs press-and-hold on touch.
+  bool wasItemLongPressed(int& id) const;
   // Like wasItemTapped, but for tab-bar tabs (id = tab index) and cover/card
   // targets (id = item index). Distinct kinds so screens with both a list and a
   // tab bar / cover (Home, Settings) don't confuse them.

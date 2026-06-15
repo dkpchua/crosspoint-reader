@@ -30,6 +30,12 @@ void NetworkModeSelectionActivity::loop() {
     return;
   }
 
+  int downId = -1;
+  if (mappedInput.wasItemTouchedDown(downId) && downId >= 0 && downId < static_cast<int>(MENU_ITEM_COUNT)) {
+    selectedIndex = downId;
+    requestUpdate();
+  }
+
   // Handle confirm button (or a tap) - select current option
   int tappedId = -1;
   const bool tapped = mappedInput.wasItemTapped(tappedId);

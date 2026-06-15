@@ -41,6 +41,12 @@ void OpdsServerListActivity::loop() {
     return;
   }
 
+  int downId = -1;
+  if (mappedInput.wasItemTouchedDown(downId) && downId >= 0) {
+    selectedIndex = downId;
+    requestUpdate();
+  }
+
   int tappedId = -1;
   if (mappedInput.wasItemTapped(tappedId) && tappedId >= 0) {
     selectedIndex = tappedId;

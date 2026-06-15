@@ -183,6 +183,14 @@ void HomeActivity::loop() {
   // menu-local ids (it is drawn with selectorIndex offset by recentBooks.size()),
   // so map the tapped id back into the global selector space. (The recent-book
   // cover is a separate, single-item draw path — tappable in a later phase.)
+  // Touch-down moves the selector to the pressed menu button (shows selected state),
+  // like Up/Down; release opens it below.
+  int downId = -1;
+  if (mappedInput.wasItemTouchedDown(downId)) {
+    selectorIndex = static_cast<int>(recentBooks.size()) + downId;
+    requestUpdate();
+  }
+
   int tappedId = -1;
   const bool tapped = mappedInput.wasItemTapped(tappedId);
   if (tapped) {

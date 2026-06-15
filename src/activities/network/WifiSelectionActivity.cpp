@@ -409,6 +409,19 @@ void WifiSelectionActivity::loop() {
 
   // Handle network list state
   if (state == WifiSelectionState::NETWORK_LIST) {
+    // Touch: down-select highlights the pressed network, tap selects it (like Confirm).
+    int downId = -1;
+    if (mappedInput.wasItemTouchedDown(downId) && downId >= 0 && downId < static_cast<int>(networks.size())) {
+      selectedNetworkIndex = downId;
+      requestUpdate();
+    }
+    int tappedId = -1;
+    if (mappedInput.wasItemTapped(tappedId) && tappedId >= 0 && tappedId < static_cast<int>(networks.size())) {
+      selectedNetworkIndex = tappedId;
+      selectNetwork(selectedNetworkIndex);
+      return;
+    }
+
     // Check for Back button to exit (cancel)
     if (mappedInput.wasPressed(MappedInputManager::Button::Back)) {
       onComplete(false);

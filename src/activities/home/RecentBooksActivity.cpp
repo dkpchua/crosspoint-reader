@@ -63,6 +63,12 @@ void RecentBooksActivity::loop() {
     return;
   }
 
+  int downId = -1;
+  if (mappedInput.wasItemTouchedDown(downId) && downId >= 0 && downId < static_cast<int>(recentBooks.size())) {
+    selectorIndex = downId;
+    requestUpdate();
+  }
+
   int tappedId = -1;
   const bool tapped = mappedInput.wasItemTapped(tappedId);
   if (tapped && tappedId >= 0 && tappedId < static_cast<int>(recentBooks.size())) selectorIndex = tappedId;

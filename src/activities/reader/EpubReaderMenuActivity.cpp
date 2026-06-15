@@ -57,6 +57,14 @@ void EpubReaderMenuActivity::loop() {
     requestUpdate();
   });
 
+  // Touch-down moves the selection to the pressed item (shows selected state), like
+  // moving with Up/Down; release activates it below.
+  int downId = -1;
+  if (mappedInput.wasItemTouchedDown(downId) && downId >= 0 && downId < static_cast<int>(menuItems.size())) {
+    selectedIndex = downId;
+    requestUpdate();
+  }
+
   // A tap selects the item and activates it in one gesture (falls into Confirm below).
   int tappedId = -1;
   const bool tapped = mappedInput.wasItemTapped(tappedId);
