@@ -424,10 +424,11 @@ void LyraTheme::drawRecentBookCover(GfxRenderer& renderer, Rect rect, const std:
     coverWidth = LyraMetrics::values.homeCoverHeight * 0.6;
   }
 
-  // Tapping the continue-reading cover opens recentBooks[0] (home selector 0).
+  // Tapping anywhere on the continue-reading card (cover + title/gray area) opens
+  // recentBooks[0] (home selector 0) — full card width, not just the cover photo.
   if (hasContinueReading) {
     TouchRegistry::getInstance().add(
-        Rect{LyraMetrics::values.contentSidePadding, tileY, coverWidth + 2 * hPaddingInSelection,
+        Rect{LyraMetrics::values.contentSidePadding, tileY, tileWidth,
              LyraMetrics::values.homeCoverHeight + 2 * hPaddingInSelection},
         0, TouchRegistry::Cover);
   }
