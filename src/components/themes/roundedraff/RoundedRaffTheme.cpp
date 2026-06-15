@@ -99,6 +99,9 @@ void RoundedRaffTheme::drawTabBar(const GfxRenderer& renderer, Rect rect, const 
     const int tabWidth = slotWidth - 8;
     const auto& tab = tabs[i];
 
+    TouchRegistry::getInstance().add(Rect{slotX, rect.y, slotWidth, rect.height}, static_cast<int>(i),
+                                     TouchRegistry::Tab);
+
     if (tab.selected) {
       renderer.fillRoundedRect(tabX, tabY, tabWidth, tabHeight, 18, selected ? Color::Black : Color::DarkGray);
     }
@@ -125,6 +128,13 @@ void RoundedRaffTheme::drawRecentBookCover(GfxRenderer& renderer, Rect rect, con
   }
   const int imgY = tileY + (tileHeight - RoundedRaffMetrics::values.homeCoverHeight) / 2;
   const int tileX = RoundedRaffMetrics::values.contentSidePadding;
+
+  // Tapping the continue-reading cover opens recentBooks[0] (home selector 0).
+  if (hasContinueReading) {
+    TouchRegistry::getInstance().add(
+        Rect{tileX + (tileWidth - coverWidth) / 2, imgY, coverWidth, RoundedRaffMetrics::values.homeCoverHeight}, 0,
+        TouchRegistry::Cover);
+  }
 
   // Draw book card regardless, fill with message based on `hasContinueReading`
   // Draw cover image as background if available (inside the box)

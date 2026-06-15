@@ -19,7 +19,7 @@
 // so add()/hitTest() are a single branch on the C3.
 class TouchRegistry {
  public:
-  enum Kind : uint8_t { Item = 0, Back = 1 };
+  enum Kind : uint8_t { Item = 0, Back = 1, Tab = 2, Cover = 3 };
 
   static TouchRegistry& getInstance();
 
@@ -36,7 +36,7 @@ class TouchRegistry {
   bool hitTest(int x, int y, Kind kind, int& outId) const;
 
  private:
-  static constexpr size_t CAPACITY = 48;  // worst case excl. keyboard grid (Phase 2)
+  static constexpr size_t CAPACITY = 64;  // worst case is the keyboard grid (~45 keys)
 
   struct Target {
     Rect rect;

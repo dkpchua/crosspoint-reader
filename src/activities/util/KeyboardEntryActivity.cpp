@@ -6,6 +6,7 @@
 #include <algorithm>
 
 #include "MappedInputManager.h"
+#include "components/TouchRegistry.h"
 #include "components/UITheme.h"
 #include "fontIds.h"
 
@@ -336,6 +337,18 @@ void KeyboardEntryActivity::loop() {
     }
   }
 
+  // A tap selects the key and presses it in one gesture. Encoded id = row*100+col
+  // (bottom function row = getContentRowCount()). Skipped in cursor mode, where a
+  // tap on a key would be ambiguous with cursor editing.
+  int tappedKey = -1;
+  if (!cursorMode && mappedInput.wasItemTapped(tappedKey)) {
+    selectedRow = tappedKey / 100;
+    selectedCol = tappedKey % 100;
+    if (handleKeyPress()) {
+      requestUpdate();
+    }
+  }
+
   if (mappedInput.wasReleased(MappedInputManager::Button::Confirm)) {
     if (confirmHeld && !confirmLongHandled && !cursorMode) {
       if (handleKeyPress()) {
@@ -646,6 +659,8 @@ void KeyboardEntryActivity::render(RenderLock&&) {
         if (snippetIdx < URL_SNIPPET_COUNT) {
           GUI.drawKeyboardKey(renderer, Rect{keyX, rowY, keyWidth, keyHeight}, urlSnippets[snippetIdx],
                               activeKeySelected, nullptr);
+          TouchRegistry::getInstance().add(Rect{keyX, rowY, keyWidth, keyHeight}, row * 100 + col,
+                                           TouchRegistry::Item);
         }
       } else {
         const KeyDef& key = layout[row][col];
@@ -663,6 +678,7 @@ void KeyboardEntryActivity::render(RenderLock&&) {
         const bool showSecondary = !symMode && row == 0 && secondaryChar != '\0';
         GUI.drawKeyboardKey(renderer, Rect{keyX, rowY, keyWidth, keyHeight}, primaryBuf, activeKeySelected,
                             showSecondary ? secondaryBuf : nullptr);
+        TouchRegistry::getInstance().add(Rect{keyX, rowY, keyWidth, keyHeight}, row * 100 + col, TouchRegistry::Item);
       }
     }
   }
@@ -691,6 +707,8 @@ void KeyboardEntryActivity::render(RenderLock&&) {
     const bool activeKeySelected = isSelected && !cursorMode;
     GUI.drawKeyboardKey(renderer, Rect{keyX, bottomRowY, bottomKeyWidth, bottomKeyHeight}, bottomKeys[i].label,
                         activeKeySelected, nullptr, bottomKeys[i].themeType);
+    TouchRegistry::getInstance().add(Rect{keyX, bottomRowY, bottomKeyWidth, bottomKeyHeight}, contentRows * 100 + i,
+                                     TouchRegistry::Item);
   }
 
   if (cursorMode) {

@@ -126,6 +126,15 @@ void SettingsActivity::loop() {
     return;
   }
 
+  // A tap on a category tab switches to it (keeps focus on the tab row); the
+  // hasChangedCategory block below swaps in that category's settings list.
+  int tabId = -1;
+  if (mappedInput.wasTabTapped(tabId) && tabId >= 0 && tabId < categoryCount) {
+    selectedCategoryIndex = tabId;
+    selectedSettingIndex = 0;
+    hasChangedCategory = true;
+  }
+
   // Handle actions with early return
   if (mappedInput.wasPressed(MappedInputManager::Button::Confirm)) {
     if (selectedSettingIndex == 0) {

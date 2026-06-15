@@ -82,6 +82,22 @@ bool MappedInputManager::wasItemTapped(int& id) const {
   return TouchRegistry::getInstance().hitTest(lx, ly, TouchRegistry::Item, id);
 }
 
+bool MappedInputManager::wasTabTapped(int& id) const {
+  float nx = 0.0f, ny = 0.0f;
+  if (!gpio.wasTouchTap(nx, ny)) return false;
+  int lx = 0, ly = 0;
+  renderer.tapToLogical(nx, ny, lx, ly);
+  return TouchRegistry::getInstance().hitTest(lx, ly, TouchRegistry::Tab, id);
+}
+
+bool MappedInputManager::wasCoverTapped(int& id) const {
+  float nx = 0.0f, ny = 0.0f;
+  if (!gpio.wasTouchTap(nx, ny)) return false;
+  int lx = 0, ly = 0;
+  renderer.tapToLogical(nx, ny, lx, ly);
+  return TouchRegistry::getInstance().hitTest(lx, ly, TouchRegistry::Cover, id);
+}
+
 bool MappedInputManager::wasPressed(const Button button) const {
   // A top-left tap fires on the release frame; expose it on Back's press edge too
   // so menus that act on wasPressed(Back) also respond. Deliberately NOT folded

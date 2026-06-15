@@ -31,6 +31,11 @@ class MappedInputManager {
   // element's id. Activities treat the id as "select + activate". False on
   // non-touch devices or when the tap missed every target.
   bool wasItemTapped(int& id) const;
+  // Like wasItemTapped, but for tab-bar tabs (id = tab index) and cover/card
+  // targets (id = item index). Distinct kinds so screens with both a list and a
+  // tab bar / cover (Home, Settings) don't confuse them.
+  bool wasTabTapped(int& id) const;
+  bool wasCoverTapped(int& id) const;
   bool wasAnyPressed() const;
   bool wasAnyReleased() const;
   unsigned long getHeldTime() const;

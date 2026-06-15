@@ -419,9 +419,15 @@ void BaseTheme::drawTabBar(const GfxRenderer& renderer, const Rect rect, const s
 
   int currentX = rect.x + BaseMetrics::values.contentSidePadding;
 
+  int tabIndex = 0;
   for (const auto& tab : tabs) {
     const int textWidth =
         renderer.getTextWidth(UI_12_FONT_ID, tab.label, tab.selected ? EpdFontFamily::BOLD : EpdFontFamily::REGULAR);
+
+    // Tap target spans the label plus the inter-tab gap, full bar height.
+    TouchRegistry::getInstance().add(
+        Rect{currentX - 3, rect.y, textWidth + BaseMetrics::values.tabSpacing, rect.height}, tabIndex++,
+        TouchRegistry::Tab);
 
     // Draw underline for selected tab
     if (tab.selected) {
@@ -494,6 +500,11 @@ void BaseTheme::drawRecentBookCover(GfxRenderer& renderer, Rect rect, const std:
   bookX = rect.x + (rect.width - bookWidth) / 2;
   const int bookY = rect.y;
   const int bookHeight = baseHeight;
+
+  // Tapping the continue-reading cover opens recentBooks[0] (home selector 0).
+  if (hasContinueReading) {
+    TouchRegistry::getInstance().add(Rect{bookX, bookY, bookWidth, bookHeight}, 0, TouchRegistry::Cover);
+  }
 
   // Bookmark dimensions (used in multiple places)
   const int bookmarkWidth = bookWidth / 8;

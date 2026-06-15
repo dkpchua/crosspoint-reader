@@ -189,7 +189,14 @@ void HomeActivity::loop() {
     selectorIndex = static_cast<int>(recentBooks.size()) + tappedId;
   }
 
-  if (tapped || mappedInput.wasReleased(MappedInputManager::Button::Confirm)) {
+  // A tap on the continue-reading cover selects that book (home selector index).
+  int coverId = -1;
+  const bool coverTapped = mappedInput.wasCoverTapped(coverId);
+  if (coverTapped && coverId >= 0 && coverId < static_cast<int>(recentBooks.size())) {
+    selectorIndex = coverId;
+  }
+
+  if (tapped || coverTapped || mappedInput.wasReleased(MappedInputManager::Button::Confirm)) {
     if (selectorIndex < recentBooks.size()) {
       onSelectBook(recentBooks[selectorIndex].path);
     } else {

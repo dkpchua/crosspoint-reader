@@ -183,8 +183,13 @@ void LyraTheme::drawTabBar(const GfxRenderer& renderer, Rect rect, const std::ve
     renderer.fillRectDither(rect.x, rect.y, rect.width, rect.height, Color::LightGray);
   }
 
+  int tabIndex = 0;
   for (const auto& tab : tabs) {
     const int textWidth = renderer.getTextWidth(UI_10_FONT_ID, tab.label, EpdFontFamily::REGULAR);
+
+    TouchRegistry::getInstance().add(
+        Rect{currentX, rect.y, textWidth + 2 * hPaddingInSelection + LyraMetrics::values.tabSpacing, rect.height},
+        tabIndex++, TouchRegistry::Tab);
 
     if (tab.selected) {
       if (selected) {
@@ -417,6 +422,14 @@ void LyraTheme::drawRecentBookCover(GfxRenderer& renderer, Rect rect, const std:
   const bool hasContinueReading = !recentBooks.empty();
   if (coverWidth == 0) {
     coverWidth = LyraMetrics::values.homeCoverHeight * 0.6;
+  }
+
+  // Tapping the continue-reading cover opens recentBooks[0] (home selector 0).
+  if (hasContinueReading) {
+    TouchRegistry::getInstance().add(
+        Rect{LyraMetrics::values.contentSidePadding, tileY, coverWidth + 2 * hPaddingInSelection,
+             LyraMetrics::values.homeCoverHeight + 2 * hPaddingInSelection},
+        0, TouchRegistry::Cover);
   }
 
   // Draw book card regardless, fill with message based on `hasContinueReading`
