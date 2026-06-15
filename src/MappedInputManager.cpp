@@ -70,8 +70,11 @@ bool MappedInputManager::wasBackGesture() const {
   renderer.tapToLogical(nx, ny, lx, ly);
   int id = 0;
   if (TouchRegistry::getInstance().hitTest(lx, ly, TouchRegistry::Back, id)) return true;
-  // Fallback corner gesture (panel-native, generous; works even with no Back target).
-  return nx <= BACK_GESTURE_FRAC_X && ny <= BACK_GESTURE_FRAC_Y;
+  // Fallback corner gesture: top-left of the LOGICAL screen (orientation-mapped), so
+  // it lands on the visual top-left in every orientation and works on screens with no
+  // header/Back target (e.g. the reader).
+  return lx <= renderer.getScreenWidth() * BACK_GESTURE_FRAC_X &&
+         ly <= renderer.getScreenHeight() * BACK_GESTURE_FRAC_Y;
 }
 
 bool MappedInputManager::wasItemTapped(int& id) const {
