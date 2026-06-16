@@ -34,9 +34,29 @@ constexpr int listIconSize = 24;
 constexpr int mainMenuColumns = 2;
 int coverWidth = 0;
 
-// Pick the generated Lucide icon variant nearest to targetPx for a UIIcon. The
-// generator emits 24/32/40/48px with each icon's optical center baked in, so a
-// scaled UI gets a crisp larger asset (not an upscaled one) and exact alignment.
+// The generated icon sizes (px). The generator (gen_icons.py) emits these.
+constexpr int kIconSizes[] = {24, 32, 40, 48};
+
+// Scale a base icon size by the board uiScale.
+int scaledIcon(int base) { return static_cast<int>(base * UITheme::uiScale() + 0.5f); }
+
+// Index of the generated size nearest targetPx, and that size in px.
+int iconVariantIndex(int targetPx) {
+  int best = 0, bestDist = 1 << 30;
+  for (int i = 0; i < 4; ++i) {
+    const int d = kIconSizes[i] > targetPx ? kIconSizes[i] - targetPx : targetPx - kIconSizes[i];
+    if (d < bestDist) {
+      bestDist = d;
+      best = i;
+    }
+  }
+  return best;
+}
+int nearestIconSize(int targetPx) { return kIconSizes[iconVariantIndex(targetPx)]; }
+
+// Generated Lucide icon variant nearest targetPx for a UIIcon. Each icon ships at
+// every size with its optical center baked in, so a scaled UI gets a crisp larger
+// asset (not an upscale) with exact alignment.
 const freeink::Icon* pickIcon(UIIcon icon, int targetPx) {
   const freeink::Icon* const* v = nullptr;
 #define VARIANTS(n)                                                                      \
@@ -61,33 +81,7 @@ const freeink::Icon* pickIcon(UIIcon icon, int targetPx) {
     default: return nullptr;
   }
 #undef VARIANTS
-  static constexpr int kSizes[] = {24, 32, 40, 48};
-  int best = 0, bestDist = 1 << 30;
-  for (int i = 0; i < 4; ++i) {
-    const int d = kSizes[i] > targetPx ? kSizes[i] - targetPx : targetPx - kSizes[i];
-    if (d < bestDist) {
-      bestDist = d;
-      best = i;
-    }
-  }
-  return v[best];
-}
-
-// Scale a base icon size by the board uiScale.
-int scaledIcon(int base) { return static_cast<int>(base * UITheme::uiScale() + 0.5f); }
-
-// Nearest generated icon size (24/32/40/48) to targetPx.
-int nearestIconSize(int targetPx) {
-  static constexpr int kSizes[] = {24, 32, 40, 48};
-  int best = kSizes[0], bestDist = 1 << 30;
-  for (int s : kSizes) {
-    const int d = s > targetPx ? s - targetPx : targetPx - s;
-    if (d < bestDist) {
-      bestDist = d;
-      best = s;
-    }
-  }
-  return best;
+  return v[iconVariantIndex(targetPx)];
 }
 }  // namespace
 

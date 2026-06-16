@@ -56,6 +56,12 @@ void XtcReaderChapterSelectionActivity::loop() {
   const int pageItems = getPageItems();
   const int totalItems = static_cast<int>(xtc->getChapters().size());
 
+  // Vertical swipe page-scrolls the list (touch nav without the side buttons).
+  if (mappedInput.wasListScroll(selectorIndex, totalItems, pageItems)) {
+    requestUpdate();
+    return;
+  }
+
   if (mappedInput.wasReleased(MappedInputManager::Button::Confirm)) {
     const auto& chapters = xtc->getChapters();
     if (!chapters.empty() && selectorIndex >= 0 && selectorIndex < static_cast<int>(chapters.size())) {

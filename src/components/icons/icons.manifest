@@ -1,0 +1,15 @@
+# CrossPoint UI icon set: each UIIcon -> a Lucide icon name.
+# Edit this, then run scripts/gen_icons.sh to regenerate generated_icons.h.
+# Browse names in freeink-sdk/libs/assets/Icons/lucide/icons/*.svg.
+folder   = folder
+text     = file-text
+image    = image
+book     = book-open
+file     = file
+recent   = clock
+settings = settings
+transfer = arrow-down-up
+library  = library-big
+wifi     = wifi
+hotspot  = router
+bookmark = bookmark

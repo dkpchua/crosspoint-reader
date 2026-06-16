@@ -25,6 +25,13 @@ int sp(int v, float s) { return static_cast<int>(std::lround(v * s)); }
 }  // namespace
 
 ThemeMetrics scaleThemeMetrics(const ThemeMetrics& b, float s) {
+  // Every pixel field is scaled explicitly below. Counts, percents, ratios, bools,
+  // and the intentionally-unscaled chrome (homeCover*, statusBar*, progressBar*) are
+  // NOT touched. This guard fails when a ThemeMetrics field is added or removed —
+  // classify the new field (scale it, or leave it and note it here) and bump the
+  // expected size, so scaling can never silently miss a field.
+  static_assert(sizeof(ThemeMetrics) == THEME_METRICS_SIZEOF,
+                "ThemeMetrics changed: review scaleThemeMetrics() and update THEME_METRICS_SIZEOF");
   ThemeMetrics m = b;
   if (s == 1.0f) return m;
   m.batteryWidth = sp(b.batteryWidth, s);

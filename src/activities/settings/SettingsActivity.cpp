@@ -131,15 +131,11 @@ void SettingsActivity::loop() {
     hasChangedCategory = true;
     requestUpdate();
   } else if (swipe == MappedInputManager::SwipeDir::Up || swipe == MappedInputManager::SwipeDir::Down) {
-    // Vertical swipe scrolls the settings list a page at a time (touch navigation
-    // without the side buttons). Swipe up moves down the list, and vice versa.
+    // Vertical swipe page-scrolls the list (touch nav without the side buttons).
+    // count is settingsCount + 1 because row 0 is the category tab bar.
     const int page = std::max(
         1, UITheme::getNumberOfItemsPerPage(renderer, true, true, BaseTheme::showButtonHints(), false));
-    if (swipe == MappedInputManager::SwipeDir::Up) {
-      selectedSettingIndex = std::min(selectedSettingIndex + page, settingsCount);
-    } else {
-      selectedSettingIndex = std::max(selectedSettingIndex - page, 0);
-    }
+    mappedInput.wasListScroll(selectedSettingIndex, settingsCount + 1, page);
     requestUpdate();
   }
 

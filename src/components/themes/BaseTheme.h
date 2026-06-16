@@ -104,6 +104,11 @@ struct ThemeMetrics {
   int textFieldLineEndOffset;
 };
 
+// Expected sizeof(ThemeMetrics), in bytes. scaleThemeMetrics() static_asserts
+// against this so a new/removed metric field can't slip through unclassified;
+// update it after adding a field (and decide there whether the field scales).
+inline constexpr unsigned THEME_METRICS_SIZEOF = 216;
+
 enum UIIcon { None = 0, Folder, Text, Image, Book, File, Recent, Settings, Transfer, Library, Wifi, Hotspot, Bookmark };
 
 enum class KeyboardKeyType { Normal, Shift, Mode, Space, Del, Ok, Disabled };
