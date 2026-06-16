@@ -51,6 +51,13 @@ class GfxRenderer {
   uint32_t frameBufferSize = HalDisplay::BUFFER_SIZE;
   std::vector<uint8_t*> bwBufferChunks;
   std::map<int, EpdFontFamily> fontMap;
+  // UI chrome font remap table (see setUiFontRemap). Empty = identity.
+  static constexpr int MAX_UI_FONT_REMAP = 8;
+  int uiFontFrom_[MAX_UI_FONT_REMAP] = {0};
+  int uiFontTo_[MAX_UI_FONT_REMAP] = {0};
+  int uiFontRemapCount_ = 0;
+  int remapUiFont(int fontId) const;
+  int glyphTop(int fontId, uint32_t cp) const;
   // Mutable because ensureSdCardFontReady() is const (called from layout code
   // that holds a const GfxRenderer&) but triggers SD card reads and heap
   // allocation inside the SdCardFont objects. Same pragmatic compromise as
@@ -95,6 +102,11 @@ class GfxRenderer {
   // Setup
   void begin();  // must be called right after display.begin()
   void insertFont(int fontId, EpdFontFamily font);
+  // UI chrome font scaling: firmware supplies a small remap table (from the board
+  // uiScale) that substitutes a larger font for each scaled UI font id at lookup
+  // time, so layout and drawing stay consistent with no call-site changes. Reader
+  // body fonts aren't in the table, so book text is unaffected. count <= 8.
+  void setUiFontRemap(const int* from, const int* to, int count);
   // Clears both the flash-font map and any SD-font registration for fontId.
   // Coupled to avoid dangling SdCardFont* in sdCardFonts_ when callers free
   // the underlying SdCardFont and forget the SD-side unregister.
@@ -207,6 +219,14 @@ class GfxRenderer {
   int getTextAdvanceX(int fontId, const char* text, EpdFontFamily::Style style) const;
   int getFontAscenderSize(int fontId) const;
   int getLineHeight(int fontId) const;
+  // Real visible font metrics (from the 'H' / 'x' glyph geometry) for vertical
+  // alignment that follows the font, not a guessed ascender fraction.
+  int getFontCapHeight(int fontId) const;
+  int getFontXHeight(int fontId) const;
+  // Offset from drawText's y (text top) to the text's optical vertical center.
+  // Center any element (icon, etc.) on a line of text via:
+  //   centerY = textTop + getTextVisualCenterOffset(fontId)
+  int getTextVisualCenterOffset(int fontId) const;
   std::string truncatedText(int fontId, const char* text, int maxWidth,
                             EpdFontFamily::Style style = EpdFontFamily::REGULAR) const;
   /// Word-wrap \p text into at most \p maxLines lines, each no wider than

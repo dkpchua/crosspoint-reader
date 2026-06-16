@@ -7,6 +7,7 @@ class GfxRenderer;
 class MappedInputManager {
  public:
   enum class Button { Back, Confirm, Left, Right, Up, Down, Power, PageBack, PageForward };
+  enum class SwipeDir { None, Left, Right, Up, Down };
 
   struct Labels {
     const char* btn1;
@@ -37,6 +38,9 @@ class MappedInputManager {
   // (id = item index). Distinct kinds so a screen with both doesn't confuse them.
   bool wasTabTapped(int& id) const;
   bool wasCoverTapped(int& id) const;
+  // Swipe direction in the current logical (oriented) frame, or None. A swipe also
+  // raises the tap helpers above, so check this first and consume it.
+  SwipeDir wasSwipe() const;
   bool wasAnyPressed() const;
   bool wasAnyReleased() const;
   unsigned long getHeldTime() const;

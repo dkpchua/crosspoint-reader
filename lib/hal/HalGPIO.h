@@ -90,8 +90,17 @@ class HalGPIO {
   // release frame (alongside wasTouchTap). For tap-vs-long-press decisions.
   unsigned long lastTouchHeldMs() const;
 
+  // Swipe (flick) gesture on the release frame: writes the start/end positions
+  // normalized 0..1 in the panel's native frame (map via GfxRenderer::tapToLogical).
+  // A swipe also raises wasTouchTap(), so check this first. False on non-touch.
+  bool wasSwipe(float& nxStart, float& nyStart, float& nxEnd, float& nyEnd) const;
+
   // True if a touch controller is present/active (runtime gate; false on the C3).
   bool hasTouch() const;
+
+  // True if a touch press or release happened this frame (the touch analogue of
+  // wasAnyPressed/Released), for resetting idle/sleep timers and CPU frequency.
+  bool wasTouchActivity() const;
 
   // Setup wake up GPIO and enter deep sleep
   void startDeepSleep();

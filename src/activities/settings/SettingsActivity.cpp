@@ -115,17 +115,34 @@ void SettingsActivity::onExit() {
 void SettingsActivity::loop() {
   bool hasChangedCategory = false;
 
+  // A horizontal swipe pages categories (and the tab bar slides to keep the new one
+  // visible). Handled first, and it suppresses the row/tab tap handlers below so the
+  // swipe's release isn't also read as a tap.
+  const MappedInputManager::SwipeDir swipe = mappedInput.wasSwipe();
+  const bool swiped = swipe != MappedInputManager::SwipeDir::None;
+  if (swipe == MappedInputManager::SwipeDir::Left) {
+    selectedCategoryIndex = ButtonNavigator::nextIndex(selectedCategoryIndex, categoryCount);
+    selectedSettingIndex = 0;
+    hasChangedCategory = true;
+    requestUpdate();
+  } else if (swipe == MappedInputManager::SwipeDir::Right) {
+    selectedCategoryIndex = ButtonNavigator::previousIndex(selectedCategoryIndex, categoryCount);
+    selectedSettingIndex = 0;
+    hasChangedCategory = true;
+    requestUpdate();
+  }
+
   // Tap a settings row to select + activate it. Row 0 is the tab bar, so the list
   // is drawn at selectedSettingIndex - 1; map the tapped row back by +1. Touch-down
   // shows it selected; release toggles/activates below.
   int downId = -1;
-  if (mappedInput.wasItemTouchedDown(downId) && downId >= 0 && downId < settingsCount) {
+  if (!swiped && mappedInput.wasItemTouchedDown(downId) && downId >= 0 && downId < settingsCount) {
     selectedSettingIndex = downId + 1;
     requestUpdate();
   }
 
   int tappedId = -1;
-  if (mappedInput.wasItemTapped(tappedId) && tappedId >= 0 && tappedId < settingsCount) {
+  if (!swiped && mappedInput.wasItemTapped(tappedId) && tappedId >= 0 && tappedId < settingsCount) {
     selectedSettingIndex = tappedId + 1;
     toggleCurrentSetting();
     requestUpdate();
@@ -135,7 +152,7 @@ void SettingsActivity::loop() {
   // A tap on a category tab switches to it (keeps focus on the tab row); the
   // hasChangedCategory block below swaps in that category's settings list.
   int tabId = -1;
-  if (mappedInput.wasTabTapped(tabId) && tabId >= 0 && tabId < categoryCount) {
+  if (!swiped && mappedInput.wasTabTapped(tabId) && tabId >= 0 && tabId < categoryCount) {
     selectedCategoryIndex = tabId;
     selectedSettingIndex = 0;
     hasChangedCategory = true;

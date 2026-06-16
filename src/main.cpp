@@ -1,5 +1,7 @@
 #include <Arduino.h>
 #include <Epub.h>
+
+#include <cmath>
 #include <FontCacheManager.h>
 #include <FontDecompressor.h>
 #include <GfxRenderer.h>
@@ -297,6 +299,34 @@ void setupDisplayAndFonts(bool seamless = false) {
   renderer.insertFont(UI_12_FONT_ID, ui12FontFamily);
   renderer.insertFont(SMALL_FONT_ID, smallFontFamily);
 
+  // UI chrome font scaling on high-density / touch boards: Ubuntu UI is only built
+  // at 10/12pt, so remap the small UI fonts up the Noto Sans ladder to grow chrome
+  // text with uiScale. Reader body fonts aren't remapped, so book text is unchanged.
+  if (const float s = UITheme::uiScale(); s > 1.05f) {
+    auto nearestNotoSans = [](float pt) -> int {
+      const struct {
+        float pt;
+        int id;
+      } sizes[] = {{12, NOTOSANS_12_FONT_ID},
+                   {14, NOTOSANS_14_FONT_ID},
+                   {16, NOTOSANS_16_FONT_ID},
+                   {18, NOTOSANS_18_FONT_ID}};
+      int best = sizes[0].id;
+      float bestDiff = 1e9f;
+      for (const auto& z : sizes) {
+        const float d = std::fabs(z.pt - pt);
+        if (d < bestDiff) {
+          bestDiff = d;
+          best = z.id;
+        }
+      }
+      return best;
+    };
+    const int from[3] = {SMALL_FONT_ID, UI_10_FONT_ID, UI_12_FONT_ID};
+    const int to[3] = {nearestNotoSans(8 * s), nearestNotoSans(10 * s), nearestNotoSans(12 * s)};
+    renderer.setUiFontRemap(from, to, 3);
+  }
+
   // Discover and load SD card fonts
   sdFontSystem.begin(renderer);
 
@@ -531,10 +561,10 @@ void loop() {
 
   // Check for any user activity (button press or release) or active background work
   static unsigned long lastActivityTime = millis();
-  if (gpio.wasAnyPressed() || gpio.wasAnyReleased() || halTiltSensor.hadActivity() ||
+  if (gpio.wasAnyPressed() || gpio.wasAnyReleased() || gpio.wasTouchActivity() || halTiltSensor.hadActivity() ||
       activityManager.preventAutoSleep()) {
     lastActivityTime = millis();         // Reset inactivity timer
-    powerManager.setPowerSaving(false);  // Restore normal CPU frequency on user activity
+    powerManager.setPowerSaving(false);  // Restore normal CPU frequency on user (button or touch) activity
   }
 
   static bool screenshotButtonsReleased = true;

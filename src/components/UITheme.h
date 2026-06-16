@@ -31,10 +31,22 @@ class UITheme {
   static int getStatusBarHeight();
   static int getProgressBarHeight();
 
+  // Per-board UI scale (BoardConfig::ACTIVE.uiScale): 1.0 on button devices, >1 on
+  // touch devices so chrome is finger-sized. Applied to the metrics below.
+  static float uiScale();
+
  private:
   const ThemeMetrics* currentMetrics;
+  // Scaled copy of the active theme's constexpr metrics (scaled by uiScale() in
+  // setTheme()). currentMetrics points here so getMetrics() returns scaled values.
+  ThemeMetrics scaledMetrics{};
   std::unique_ptr<BaseTheme> currentTheme;
 };
+
+// Scale a theme's pixel-dimension metrics by `scale` (counts, percents, ratios,
+// and bools are left untouched). At scale 1.0 it is an exact copy (no drift).
+// Shared by UITheme (active-theme metrics) and each theme's own draw code.
+ThemeMetrics scaleThemeMetrics(const ThemeMetrics& base, float scale);
 
 // Helper macro to access current theme
 #define GUI UITheme::getInstance().getTheme()

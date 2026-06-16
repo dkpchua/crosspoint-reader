@@ -1,9 +1,11 @@
 #include "UITheme.h"
 
+#include <BoardConfig.h>
 #include <FsHelpers.h>
 #include <GfxRenderer.h>
 #include <Logging.h>
 
+#include <cmath>
 #include <memory>
 
 #include "MappedInputManager.h"
@@ -14,6 +16,66 @@
 #include "components/themes/roundedraff/RoundedRaffTheme.h"
 
 UITheme UITheme::instance;
+
+float UITheme::uiScale() { return BoardConfig::ACTIVE.uiScale; }
+
+namespace {
+// Round a pixel dimension by the UI scale.
+int sp(int v, float s) { return static_cast<int>(std::lround(v * s)); }
+}  // namespace
+
+ThemeMetrics scaleThemeMetrics(const ThemeMetrics& b, float s) {
+  ThemeMetrics m = b;
+  if (s == 1.0f) return m;
+  m.batteryWidth = sp(b.batteryWidth, s);
+  m.batteryHeight = sp(b.batteryHeight, s);
+  m.topPadding = sp(b.topPadding, s);
+  m.batteryBarHeight = sp(b.batteryBarHeight, s);
+  m.headerHeight = sp(b.headerHeight, s);
+  m.verticalSpacing = sp(b.verticalSpacing, s);
+  m.contentSidePadding = sp(b.contentSidePadding, s);
+  m.listRowHeight = sp(b.listRowHeight, s);
+  m.listWithSubtitleRowHeight = sp(b.listWithSubtitleRowHeight, s);
+  m.menuRowHeight = sp(b.menuRowHeight, s);
+  m.menuSpacing = sp(b.menuSpacing, s);
+  m.tabSpacing = sp(b.tabSpacing, s);
+  m.tabBarHeight = sp(b.tabBarHeight, s);
+  m.scrollBarWidth = sp(b.scrollBarWidth, s);
+  m.scrollBarRightOffset = sp(b.scrollBarRightOffset, s);
+  m.homeTopPadding = sp(b.homeTopPadding, s);
+  // homeCoverHeight / homeCoverTileHeight are intentionally NOT scaled: the home
+  // screen fills the fixed panel height exactly, so scaling the decorative cover
+  // would push the menu off the bottom. The cover stays native; the menu (a touch
+  // target) scales and is fit into the remaining space by drawButtonMenu.
+  m.homeMenuTopOffset = sp(b.homeMenuTopOffset, s);
+  m.buttonHintsHeight = sp(b.buttonHintsHeight, s);
+  m.sideButtonHintsWidth = sp(b.sideButtonHintsWidth, s);
+  m.progressBarHeight = sp(b.progressBarHeight, s);
+  m.progressBarMarginTop = sp(b.progressBarMarginTop, s);
+  m.statusBarHorizontalMargin = sp(b.statusBarHorizontalMargin, s);
+  m.statusBarVerticalMargin = sp(b.statusBarVerticalMargin, s);
+  m.keyboardKeyWidth = sp(b.keyboardKeyWidth, s);
+  m.keyboardKeyHeight = sp(b.keyboardKeyHeight, s);
+  m.keyboardKeySpacing = sp(b.keyboardKeySpacing, s);
+  m.keyboardBottomKeyHeight = sp(b.keyboardBottomKeyHeight, s);
+  m.keyboardBottomKeySpacing = sp(b.keyboardBottomKeySpacing, s);
+  m.keyboardVerticalOffset = sp(b.keyboardVerticalOffset, s);
+  m.keyboardKeyCornerRadius = sp(b.keyboardKeyCornerRadius, s);
+  m.keyboardSecondaryLabelRightPadding = sp(b.keyboardSecondaryLabelRightPadding, s);
+  m.keyboardSecondaryLabelTopPadding = sp(b.keyboardSecondaryLabelTopPadding, s);
+  m.keyboardMinArrowHeadSize = sp(b.keyboardMinArrowHeadSize, s);
+  m.popupMarginX = sp(b.popupMarginX, s);
+  m.popupMarginY = sp(b.popupMarginY, s);
+  m.popupFrameThickness = sp(b.popupFrameThickness, s);
+  m.popupCornerRadius = sp(b.popupCornerRadius, s);
+  m.popupTextBaselineOffsetY = sp(b.popupTextBaselineOffsetY, s);
+  m.popupProgressBarHeight = sp(b.popupProgressBarHeight, s);
+  m.textFieldHorizontalPadding = sp(b.textFieldHorizontalPadding, s);
+  m.textFieldNormalThickness = sp(b.textFieldNormalThickness, s);
+  m.textFieldCursorThickness = sp(b.textFieldCursorThickness, s);
+  m.textFieldLineEndOffset = sp(b.textFieldLineEndOffset, s);
+  return m;
+}
 
 UITheme::UITheme() {
   auto themeType = static_cast<CrossPointSettings::UI_THEME>(SETTINGS.uiTheme);
@@ -26,28 +88,31 @@ void UITheme::reload() {
 }
 
 void UITheme::setTheme(CrossPointSettings::UI_THEME type) {
+  const ThemeMetrics* base = &BaseMetrics::values;
   switch (type) {
     case CrossPointSettings::UI_THEME::CLASSIC:
       LOG_DBG("UI", "Using Classic theme");
       currentTheme = std::make_unique<BaseTheme>();
-      currentMetrics = &BaseMetrics::values;
+      base = &BaseMetrics::values;
       break;
     case CrossPointSettings::UI_THEME::LYRA:
       LOG_DBG("UI", "Using Lyra theme");
       currentTheme = std::make_unique<LyraTheme>();
-      currentMetrics = &LyraMetrics::values;
+      base = &LyraMetrics::values;
       break;
     case CrossPointSettings::UI_THEME::ROUNDEDRAFF:
       LOG_DBG("UI", "Using RoundedRaff theme");
       currentTheme = std::make_unique<RoundedRaffTheme>();
-      currentMetrics = &RoundedRaffMetrics::values;
+      base = &RoundedRaffMetrics::values;
       break;
     case CrossPointSettings::UI_THEME::LYRA_3_COVERS:
       LOG_DBG("UI", "Using Lyra 3 Covers theme");
       currentTheme = std::make_unique<Lyra3CoversTheme>();
-      currentMetrics = &Lyra3CoversMetrics::values;
+      base = &Lyra3CoversMetrics::values;
       break;
   }
+  scaledMetrics = scaleThemeMetrics(*base, uiScale());
+  currentMetrics = &scaledMetrics;
 }
 
 int UITheme::getNumberOfItemsPerPage(const GfxRenderer& renderer, bool hasHeader, bool hasTabBar, bool hasButtonHints,

@@ -231,6 +231,12 @@ class BaseTheme {
                                bool inactiveSelection = false) const;
   virtual bool showsFileIcons() const { return false; }
 
+  // Horizontal scroll offset (px to subtract from tab X positions) that keeps the
+  // selected tab visible when the tab row is wider than availWidth — used by every
+  // theme's drawTabBar so scaled-up tabs slide instead of running off-screen.
+  // Returns 0 when the whole row fits.
+  static int tabBarScrollOffset(int contentWidth, int selStart, int selWidth, int availWidth);
+
   // Shared constants and helpers for battery drawing (used by all themes)
   static constexpr int batteryPercentSpacing = 4;
   static void drawBatteryOutline(const GfxRenderer& renderer, int x, int y, int battWidth, int rectHeight);

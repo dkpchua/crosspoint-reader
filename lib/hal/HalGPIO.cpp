@@ -249,7 +249,13 @@ bool HalGPIO::wasTouchDown(float& nx, float& ny) const { return inputMgr.wasTouc
 
 unsigned long HalGPIO::lastTouchHeldMs() const { return inputMgr.lastTouchHeldMs(); }
 
+bool HalGPIO::wasSwipe(float& nxStart, float& nyStart, float& nxEnd, float& nyEnd) const {
+  return inputMgr.wasSwipe(nxStart, nyStart, nxEnd, nyEnd);
+}
+
 bool HalGPIO::hasTouch() const { return inputMgr.hasTouch(); }
+
+bool HalGPIO::wasTouchActivity() const { return inputMgr.wasTouchActivity(); }
 
 bool HalGPIO::isXteinkDevice() const {
   const auto board = BoardConfig::ACTIVE.board;

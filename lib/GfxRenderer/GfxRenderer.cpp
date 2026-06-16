@@ -100,6 +100,23 @@ void GfxRenderer::insertFont(const int fontId, EpdFontFamily font) {
   }
 }
 
+void GfxRenderer::setUiFontRemap(const int* from, const int* to, int count) {
+  if (count < 0) count = 0;
+  if (count > MAX_UI_FONT_REMAP) count = MAX_UI_FONT_REMAP;
+  for (int i = 0; i < count; ++i) {
+    uiFontFrom_[i] = from[i];
+    uiFontTo_[i] = to[i];
+  }
+  uiFontRemapCount_ = count;
+}
+
+int GfxRenderer::remapUiFont(const int fontId) const {
+  for (int i = 0; i < uiFontRemapCount_; ++i) {
+    if (uiFontFrom_[i] == fontId) return uiFontTo_[i];
+  }
+  return fontId;
+}
+
 // Translate logical (x,y) coordinates to physical panel coordinates based on current orientation
 // This should always be inlined for better performance
 static inline void rotateCoordinates(const GfxRenderer::Orientation orientation, const int x, const int y, int* phyX,
@@ -365,7 +382,7 @@ int GfxRenderer::getTextWidth(const int fontId, const char* text, const EpdFontF
     return 0;
   }
 
-  const auto fontIt = fontMap.find(fontId);
+  const auto fontIt = fontMap.find(remapUiFont(fontId));
   if (fontIt == fontMap.end()) {
     LOG_ERR("GFX", "Font %d not found", fontId);
     return 0;
@@ -407,7 +424,7 @@ void GfxRenderer::drawText(const int fontId, const int x, const int y, const cha
     return;
   }
 
-  const auto fontIt = fontMap.find(fontId);
+  const auto fontIt = fontMap.find(remapUiFont(fontId));
   if (fontIt == fontMap.end()) {
     LOG_ERR("GFX", "Font %d not found", fontId);
     return;
@@ -1419,7 +1436,7 @@ int GfxRenderer::getSpaceWidth(const int fontId, const EpdFontFamily::Style styl
     return fp4::toPixel(sdIt->second->getAdvance(' ', resolvedStyle));
   }
 
-  const auto fontIt = fontMap.find(fontId);
+  const auto fontIt = fontMap.find(remapUiFont(fontId));
   if (fontIt == fontMap.end()) {
     LOG_ERR("GFX", "Font %d not found", fontId);
     return 0;
@@ -1440,7 +1457,7 @@ int GfxRenderer::getSpaceAdvance(const int fontId, const uint32_t leftCp, const 
     return fp4::toPixel(sdIt->second->getAdvance(' ', resolvedStyle));
   }
 
-  const auto fontIt = fontMap.find(fontId);
+  const auto fontIt = fontMap.find(remapUiFont(fontId));
   if (fontIt == fontMap.end()) return 0;
   const auto& font = fontIt->second;
   const EpdGlyph* spaceGlyph = font.getGlyph(' ', style);
@@ -1454,7 +1471,7 @@ int GfxRenderer::getSpaceAdvance(const int fontId, const uint32_t leftCp, const 
 
 int GfxRenderer::getKerning(const int fontId, const uint32_t leftCp, const uint32_t rightCp,
                             const EpdFontFamily::Style style) const {
-  const auto fontIt = fontMap.find(fontId);
+  const auto fontIt = fontMap.find(remapUiFont(fontId));
   if (fontIt == fontMap.end()) return 0;
   const int kernFP = fontIt->second.getKerning(leftCp, rightCp, style);  // 4.4 fixed-point
   return fp4::toPixel(kernFP);                                           // snap 4.4 fixed-point to nearest pixel
@@ -1476,7 +1493,7 @@ int GfxRenderer::getTextAdvanceX(const int fontId, const char* text, EpdFontFami
     return fp4::toPixel(widthFP);
   }
 
-  const auto fontIt = fontMap.find(fontId);
+  const auto fontIt = fontMap.find(remapUiFont(fontId));
   if (fontIt == fontMap.end()) {
     LOG_ERR("GFX", "Font %d not found", fontId);
     return 0;
@@ -1512,7 +1529,7 @@ int GfxRenderer::getTextAdvanceX(const int fontId, const char* text, EpdFontFami
 }
 
 int GfxRenderer::getFontAscenderSize(const int fontId) const {
-  const auto fontIt = fontMap.find(fontId);
+  const auto fontIt = fontMap.find(remapUiFont(fontId));
   if (fontIt == fontMap.end()) {
     LOG_ERR("GFX", "Font %d not found", fontId);
     return 0;
@@ -1522,7 +1539,7 @@ int GfxRenderer::getFontAscenderSize(const int fontId) const {
 }
 
 int GfxRenderer::getLineHeight(const int fontId) const {
-  const auto fontIt = fontMap.find(fontId);
+  const auto fontIt = fontMap.find(remapUiFont(fontId));
   if (fontIt == fontMap.end()) {
     LOG_ERR("GFX", "Font %d not found", fontId);
     return 0;
@@ -1532,12 +1549,37 @@ int GfxRenderer::getLineHeight(const int fontId) const {
 }
 
 int GfxRenderer::getTextHeight(const int fontId) const {
-  const auto fontIt = fontMap.find(fontId);
+  const auto fontIt = fontMap.find(remapUiFont(fontId));
   if (fontIt == fontMap.end()) {
     LOG_ERR("GFX", "Font %d not found", fontId);
     return 0;
   }
   return fontIt->second.getData(EpdFontFamily::REGULAR)->ascender;
+}
+
+// Height of a reference glyph above the baseline (glyph->top). 'H' gives the real
+// cap height, 'x' the x-height — the actual visible extents of the font, for
+// vertical centering that follows the font instead of a guessed ascender fraction.
+int GfxRenderer::glyphTop(const int fontId, const uint32_t cp) const {
+  const auto fontIt = fontMap.find(remapUiFont(fontId));
+  if (fontIt == fontMap.end()) return 0;
+  const EpdGlyph* g = fontIt->second.getGlyph(cp, EpdFontFamily::REGULAR);
+  return g ? g->top : 0;
+}
+
+int GfxRenderer::getFontCapHeight(const int fontId) const { return glyphTop(fontId, 'H'); }
+int GfxRenderer::getFontXHeight(const int fontId) const { return glyphTop(fontId, 'x'); }
+
+int GfxRenderer::getTextVisualCenterOffset(const int fontId) const {
+  // Distance from drawText's y (text top) down to the text's optical middle. The
+  // baseline is at y + ascender; the lowercase mass is centered at half the
+  // x-height above it, so the optical center is ascender - xHeight/2 below the top.
+  // x-height-based (UI text is lowercase-heavy); falls back to ascender*0.7 if the
+  // 'x' glyph is missing. Scales with the font, so no per-size tweaking.
+  const int ascender = getFontAscenderSize(fontId);
+  const int xHeight = getFontXHeight(fontId);
+  if (xHeight <= 0) return (ascender * 7) / 10;
+  return ascender - xHeight / 2;
 }
 
 void GfxRenderer::drawTextRotated90CW(const int fontId, const int x, const int y, const char* text, const bool black,
@@ -1547,7 +1589,7 @@ void GfxRenderer::drawTextRotated90CW(const int fontId, const int x, const int y
     return;
   }
 
-  const auto fontIt = fontMap.find(fontId);
+  const auto fontIt = fontMap.find(remapUiFont(fontId));
   if (fontIt == fontMap.end()) {
     LOG_ERR("GFX", "Font %d not found", fontId);
     return;

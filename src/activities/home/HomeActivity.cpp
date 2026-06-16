@@ -268,11 +268,13 @@ void HomeActivity::render(RenderLock&&) {
     menuIcons.insert(menuIcons.begin(), Book);
   }
 
+  // Menu fills the space between the cover and the bottom reserve (button hints
+  // when shown, else a margin). Sizing it to the real remaining height lets
+  // drawButtonMenu fit the items, so a scaled-up menu never runs off the bottom.
+  const int menuY = metrics.homeTopPadding + metrics.homeCoverTileHeight + metrics.homeMenuTopOffset;
+  const int bottomReserve = (BaseTheme::showButtonHints() ? metrics.buttonHintsHeight : 0) + metrics.verticalSpacing;
   GUI.drawButtonMenu(
-      renderer,
-      Rect{0, metrics.homeTopPadding + metrics.homeCoverTileHeight + metrics.homeMenuTopOffset, pageWidth,
-           pageHeight - (metrics.headerHeight + metrics.homeTopPadding + metrics.verticalSpacing +
-                         metrics.homeMenuTopOffset + metrics.buttonHintsHeight)},
+      renderer, Rect{0, menuY, pageWidth, pageHeight - menuY - bottomReserve},
       static_cast<int>(menuItems.size()),
       metrics.homeContinueReadingInMenu ? selectorIndex : selectorIndex - recentBooks.size(),
       [&menuItems](int index) { return std::string(menuItems[index]); },

@@ -2,6 +2,8 @@
 
 #include <GfxRenderer.h>
 
+#include <cstdlib>
+
 #include "CrossPointSettings.h"
 #include "components/TouchRegistry.h"
 
@@ -114,6 +116,22 @@ bool MappedInputManager::wasCoverTapped(int& id) const {
   int lx = 0, ly = 0;
   renderer.tapToLogical(nx, ny, lx, ly);
   return TouchRegistry::getInstance().hitTest(lx, ly, TouchRegistry::Cover, id);
+}
+
+MappedInputManager::SwipeDir MappedInputManager::wasSwipe() const {
+  float nxs = 0.0f, nys = 0.0f, nxe = 0.0f, nye = 0.0f;
+  if (!gpio.wasSwipe(nxs, nys, nxe, nye)) return SwipeDir::None;
+  // Map both endpoints into the logical frame so the direction follows what the
+  // user sees regardless of panel mount/orientation.
+  int sx = 0, sy = 0, ex = 0, ey = 0;
+  renderer.tapToLogical(nxs, nys, sx, sy);
+  renderer.tapToLogical(nxe, nye, ex, ey);
+  const int dx = ex - sx;
+  const int dy = ey - sy;
+  if (std::abs(dx) >= std::abs(dy)) {
+    return dx < 0 ? SwipeDir::Left : SwipeDir::Right;
+  }
+  return dy < 0 ? SwipeDir::Up : SwipeDir::Down;
 }
 
 bool MappedInputManager::wasPressed(const Button button) const {
