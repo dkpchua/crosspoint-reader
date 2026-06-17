@@ -110,6 +110,12 @@ EpdFont ui12RegularFont(&ubuntu_12_regular);
 EpdFont ui12BoldFont(&ubuntu_12_bold);
 EpdFontFamily ui12FontFamily(&ui12RegularFont, &ui12BoldFont);
 
+// 14pt UI cut (2-bit) for the enlarged chrome the uiScale remap lands on for
+// touch boards. Same Hebrew + Vietnamese coverage as the 10/12pt cuts.
+EpdFont ui14RegularFont(&ubuntu_14_regular);
+EpdFont ui14BoldFont(&ubuntu_14_bold);
+EpdFontFamily ui14FontFamily(&ui14RegularFont, &ui14BoldFont);
+
 // measurement of power button press duration calibration value
 unsigned long t1 = 0;
 unsigned long t2 = 0;
@@ -297,21 +303,22 @@ void setupDisplayAndFonts(bool seamless = false) {
 #endif  // OMIT_FONTS
   renderer.insertFont(UI_10_FONT_ID, ui10FontFamily);
   renderer.insertFont(UI_12_FONT_ID, ui12FontFamily);
+  renderer.insertFont(UI_14_FONT_ID, ui14FontFamily);
   renderer.insertFont(SMALL_FONT_ID, smallFontFamily);
 
-  // UI chrome font scaling on touch/high-density boards: Ubuntu UI is only built at
-  // 10/12pt, so remap the UI fonts up the Noto Sans ladder with uiScale. SMALL is
-  // deliberately not remapped — it's compact secondary text (status bar, subtitles,
-  // battery %) that stays small. Reader body fonts aren't remapped either.
+  // UI chrome font scaling on touch/high-density boards: substitute a larger Ubuntu
+  // UI cut for each scaled UI font id at lookup time so menus/settings grow to finger
+  // size. We stay on the Ubuntu ladder (not Noto Sans) because the UI font carries
+  // Hebrew + Vietnamese glyphs that the Noto Sans reader fonts don't — remapping onto
+  // Noto Sans would drop those scripts from the UI. SMALL is deliberately not remapped
+  // — it's compact secondary text (status bar, subtitles, battery %) that stays small.
+  // Reader body fonts aren't remapped either.
   if (const float s = UITheme::uiScale(); s > 1.05f) {
-    auto nearestNotoSans = [](float pt) -> int {
+    auto nearestUbuntu = [](float pt) -> int {
       const struct {
         float pt;
         int id;
-      } sizes[] = {{12, NOTOSANS_12_FONT_ID},
-                   {14, NOTOSANS_14_FONT_ID},
-                   {16, NOTOSANS_16_FONT_ID},
-                   {18, NOTOSANS_18_FONT_ID}};
+      } sizes[] = {{10, UI_10_FONT_ID}, {12, UI_12_FONT_ID}, {14, UI_14_FONT_ID}};
       int best = sizes[0].id;
       float bestDiff = 1e9f;
       for (const auto& z : sizes) {
@@ -324,7 +331,7 @@ void setupDisplayAndFonts(bool seamless = false) {
       return best;
     };
     const int from[2] = {UI_10_FONT_ID, UI_12_FONT_ID};
-    const int to[2] = {nearestNotoSans(10 * s), nearestNotoSans(12 * s)};
+    const int to[2] = {nearestUbuntu(10 * s), nearestUbuntu(12 * s)};
     renderer.setUiFontRemap(from, to, 2);
   }
 
