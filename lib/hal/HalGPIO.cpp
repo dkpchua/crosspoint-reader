@@ -206,6 +206,18 @@ void HalGPIO::begin() {
 #if FREEINK_MCU_C3
   _deviceType = detectDeviceTypeWithFingerprint();
 
+  // Sync the runtime board profile to the detected device NOW, before any I2C
+  // consumer begins. powerManager/clock/tilt begin() run immediately after this
+  // in setup() and rely on BoardConfig::ACTIVE: HalPowerManager only calls
+  // Wire.begin() when the active profile has an I2C gauge (gaugeAddr != 0), and
+  // the X3 clock/tilt raw-Wire paths assume that begin happened. The dual X3+X4
+  // binary boots as X4 (gaugeAddr 0), so without this the X4 profile stays active
+  // through those begins, Wire is never (re)initialised after the detection probe
+  // end()s it, and every X3 read fails with lock==NULL ("could not acquire lock"
+  // / "NULL TX buffer pointer"). FreeInkDisplay also calls selectDevice() later,
+  // but that is after the I2C consumers — too late. selectDevice() is idempotent.
+  BoardConfig::selectDevice(deviceIsX3() ? BoardConfig::Board::XteinkX3 : BoardConfig::Board::XteinkX4);
+
   if (deviceIsX4()) {
     pinMode(BAT_GPIO0, INPUT);
     pinMode(UART0_RXD, INPUT);
