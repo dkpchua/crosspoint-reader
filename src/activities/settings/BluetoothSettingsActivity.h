@@ -28,7 +28,7 @@ class BluetoothSettingsActivity final : public Activity {
   enum class View { Menu, Scan, Paired };
 
   // Menu row actions.
-  enum class Action { ToggleBt, Scan, Disconnect, MapButtons, PairedDevices, PresetFree2, PresetFree3, ClearMap };
+  enum class Action { ToggleBt, Scan, Disconnect, MapButtons, PairedDevices };
   struct MenuRow {
     Action action;
     StrId label;
@@ -55,9 +55,8 @@ class BluetoothSettingsActivity final : public Activity {
   void rebuildMenuRows();
   void handleMenuConfirm();
   void startScanView();
-  void applyPreset(bool free3);
   void setBanner(const char* text);
 
-  std::string deviceLabel(int index) const;   // scan list row text
-  std::string pairedLabel(int index) const;    // paired list row text
+  std::string deviceLabel(int index) const;  // scan list row text
+  std::string pairedLabel(int index) const;  // paired list row text
 };

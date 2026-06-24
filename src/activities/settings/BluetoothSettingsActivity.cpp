@@ -45,28 +45,8 @@ void BluetoothSettingsActivity::rebuildMenuRows() {
     if (BleHid.isConnected()) menuRows.push_back({Action::Disconnect, StrId::STR_BT_DISCONNECT});
     menuRows.push_back({Action::PairedDevices, StrId::STR_BT_PAIRED_DEVICES});
     menuRows.push_back({Action::MapButtons, StrId::STR_BT_MAP_BUTTONS});
-    menuRows.push_back({Action::PresetFree2, StrId::STR_BT_PRESET_FREE2});
-    menuRows.push_back({Action::PresetFree3, StrId::STR_BT_PRESET_FREE3});
-    menuRows.push_back({Action::ClearMap, StrId::STR_BT_CLEAR_MAP});
   }
   if (menuIndex >= static_cast<int>(menuRows.size())) menuIndex = 0;
-}
-
-void BluetoothSettingsActivity::applyPreset(bool free3) {
-  // Starter presets. Page-turner remotes commonly emit PageUp/PageDown (and a
-  // center key on the 3-button Free3); the user can re-map via "Map Remote
-  // Buttons" if their device sends different codes.
-  using Btn = MappedInputManager::Button;
-  for (auto& e : SETTINGS.bleKeyMap) e = CrossPointSettings::BleKeyMapEntry{};
-  auto set = [&](int slot, freeink::SpecialKey key, Btn button) {
-    SETTINGS.bleKeyMap[slot].keyKind = 0;  // SpecialKey
-    SETTINGS.bleKeyMap[slot].keyValue = static_cast<uint8_t>(key);
-    SETTINGS.bleKeyMap[slot].button = static_cast<uint8_t>(button);
-  };
-  set(0, freeink::SpecialKey::PageDown, Btn::PageForward);
-  set(1, freeink::SpecialKey::PageUp, Btn::PageBack);
-  if (free3) set(2, freeink::SpecialKey::Enter, Btn::Confirm);
-  SETTINGS.saveToFile();
 }
 
 void BluetoothSettingsActivity::startScanView() {
@@ -113,22 +93,6 @@ void BluetoothSettingsActivity::handleMenuConfirm() {
                                requestUpdate();
                              });
       break;
-    case Action::PresetFree2:
-      applyPreset(false);
-      setBanner(tr(STR_BT_PRESET_FREE2));
-      requestUpdate();
-      break;
-    case Action::PresetFree3:
-      applyPreset(true);
-      setBanner(tr(STR_BT_PRESET_FREE3));
-      requestUpdate();
-      break;
-    case Action::ClearMap:
-      for (auto& e : SETTINGS.bleKeyMap) e = CrossPointSettings::BleKeyMapEntry{};
-      SETTINGS.saveToFile();
-      setBanner(tr(STR_BT_CLEAR_MAP));
-      requestUpdate();
-      break;
   }
 }
 
@@ -173,9 +137,9 @@ void BluetoothSettingsActivity::loop() {
   }
 
   // Navigation within the active list.
-  const int count = view == View::Menu      ? static_cast<int>(menuRows.size())
-                    : view == View::Scan    ? BleHid.deviceCount()
-                                            : BleHid.pairedCount();
+  const int count = view == View::Menu   ? static_cast<int>(menuRows.size())
+                    : view == View::Scan ? BleHid.deviceCount()
+                                         : BleHid.pairedCount();
   int* idx = view == View::Menu ? &menuIndex : view == View::Scan ? &scanIndex : &pairedIndex;
   buttonNavigator.onNext([this, count, idx] {
     if (count > 0) *idx = ButtonNavigator::nextIndex(*idx, count);
@@ -268,7 +232,8 @@ void BluetoothSettingsActivity::render(RenderLock&&) {
         renderer, listRect, static_cast<int>(menuRows.size()), menuIndex,
         [this](int i) { return std::string(I18N.get(menuRows[i].label)); }, nullptr, nullptr,
         [this](int i) -> std::string {
-          if (menuRows[i].action == Action::ToggleBt) return SETTINGS.bluetoothEnabled ? tr(STR_STATE_ON) : tr(STR_STATE_OFF);
+          if (menuRows[i].action == Action::ToggleBt)
+            return SETTINGS.bluetoothEnabled ? tr(STR_STATE_ON) : tr(STR_STATE_OFF);
           return "";
         },
         true);

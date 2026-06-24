@@ -17,6 +17,7 @@
 #include <iterator>
 #include <limits>
 
+#include "BleInput.h"
 #include "BookmarkEntry.h"
 #include "CrossPointSettings.h"
 #include "CrossPointState.h"
@@ -856,10 +857,26 @@ void EpubReaderActivity::render(RenderLock&& lock) {
 
       const auto popupFn = [this]() { GUI.drawPopup(renderer, tr(STR_INDEXING)); };
 
-      if (!section->createSectionFile(SETTINGS.getReaderFontId(), SETTINGS.getReaderLineCompression(),
-                                      SETTINGS.extraParagraphSpacing, SETTINGS.paragraphAlignment, viewportWidth,
-                                      viewportHeight, SETTINGS.hyphenationEnabled, SETTINGS.embeddedStyle,
-                                      SETTINGS.imageRendering, SETTINGS.focusReadingEnabled, popupFn)) {
+      auto buildSection = [&]() {
+        return section->createSectionFile(SETTINGS.getReaderFontId(), SETTINGS.getReaderLineCompression(),
+                                          SETTINGS.extraParagraphSpacing, SETTINGS.paragraphAlignment, viewportWidth,
+                                          viewportHeight, SETTINGS.hyphenationEnabled, SETTINGS.embeddedStyle,
+                                          SETTINGS.imageRendering, SETTINGS.focusReadingEnabled, popupFn);
+      };
+
+      bool built = buildSection();
+      if (!built && SETTINGS.bluetoothEnabled) {
+        // Building a section needs a large contiguous inflate (deflate) window that the
+        // resident NimBLE stack fragments out of existence (~16 KB max block with BT on).
+        // Free the BLE stack, build, then restore it. The chapter is cached afterwards, so
+        // this recovery runs at most once per uncached chapter; BT reconnects in a few s.
+        LOG_INF("ERS", "Section build failed with Bluetooth on; freeing BLE RAM and retrying");
+        bleinput::stop();
+        built = buildSection();
+        const bool bleOk = bleinput::ensureStarted();
+        LOG_INF("ERS", "BLE restart after build: begin=%d (auto-reconnect follows)", bleOk);
+      }
+      if (!built) {
         LOG_ERR("ERS", "Failed to persist page data to SD");
         section.reset();
         showPendingSyncSaveError();

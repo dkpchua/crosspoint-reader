@@ -500,8 +500,8 @@ void loop() {
   static unsigned long lastMemPrint = 0;
 
   gpio.update();
-  BleHid.poll();                  // drive BLE auto-reconnect + key auto-repeat (no-op when BT off)
-  mappedInputManager.pollBle();   // drain BLE keys -> logical-button overlay for this frame
+  BleHid.poll();                 // drive BLE auto-reconnect + key auto-repeat (no-op when BT off)
+  mappedInputManager.pollBle();  // drain BLE keys -> logical-button overlay for this frame
   halTiltSensor.update(SETTINGS.tiltPageTurn, SETTINGS.orientation, activityManager.isReaderActivity());
 
   renderer.setFadingFix(SETTINGS.fadingFix);

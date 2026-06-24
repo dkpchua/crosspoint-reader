@@ -21,14 +21,18 @@ const BleButtonMapActivity::Fn BleButtonMapActivity::kFunctions[] = {
     {MappedInputManager::Button::Left, StrId::STR_DIR_LEFT},
     {MappedInputManager::Button::Right, StrId::STR_DIR_RIGHT},
 };
-const uint8_t BleButtonMapActivity::kFunctionCount =
-    static_cast<uint8_t>(sizeof(kFunctions) / sizeof(kFunctions[0]));
+const uint8_t BleButtonMapActivity::kFunctionCount = static_cast<uint8_t>(sizeof(kFunctions) / sizeof(kFunctions[0]));
 
 void BleButtonMapActivity::onEnter() {
   Activity::onEnter();
   step = Step::WaitForKey;
   capturedKind = 0xFF;
   functionIndex = 0;
+  // Start every mapping session from a clean slate: the user re-maps each remote
+  // button once, so a button can't be left bound to a stale action and there's no
+  // separate "clear mappings" step to remember.
+  for (auto& e : SETTINGS.bleKeyMap) e = CrossPointSettings::BleKeyMapEntry{};
+  SETTINGS.saveToFile();
   mappedInput.setBleCaptureMode(true);
   requestUpdate();
 }
@@ -40,6 +44,13 @@ void BleButtonMapActivity::onExit() {
 
 bool BleButtonMapActivity::assignCapturedKey(MappedInputManager::Button button) {
   const uint8_t btn = static_cast<uint8_t>(button);
+  // One key per action: drop any other key currently bound to this action so the same
+  // action can't be triggered by two different remote buttons.
+  for (auto& e : SETTINGS.bleKeyMap) {
+    if (e.button == btn && !(e.keyKind == capturedKind && e.keyValue == capturedValue)) {
+      e = CrossPointSettings::BleKeyMapEntry{};
+    }
+  }
   // Update an existing binding for this key, if present.
   for (auto& e : SETTINGS.bleKeyMap) {
     if (e.button != 0xFF && e.keyKind == capturedKind && e.keyValue == capturedValue) {
@@ -92,11 +103,8 @@ void BleButtonMapActivity::loop() {
   });
 
   if (mappedInput.wasPressed(MappedInputManager::Button::Confirm)) {
-    if (!assignCapturedKey(kFunctions[functionIndex].button)) {
-      // Table full: surface it instead of silently dropping the binding.
-      errorUntil = millis() + 2500;
-    }
-    // Back to capturing so the user can map the next remote button.
+    assignCapturedKey(kFunctions[functionIndex].button);
+    // Back to capturing so the user can map (or re-map) the next remote button.
     step = Step::WaitForKey;
     capturedKind = 0xFF;
     requestUpdate();
@@ -144,10 +152,6 @@ void BleButtonMapActivity::render(RenderLock&&) {
     GUI.drawList(
         renderer, Rect{0, topOffset, pageWidth, contentHeight}, kFunctionCount, functionIndex,
         [this](int i) { return std::string(I18N.get(kFunctions[i].label)); }, nullptr, nullptr, nullptr, false);
-  }
-
-  if (errorUntil > millis()) {
-    GUI.drawHelpText(renderer, Rect{0, pageHeight - metrics.buttonHintsHeight - 22, pageWidth, 20}, tr(STR_BT_MAP_FULL));
   }
 
   const char* confirm = step == Step::WaitForKey ? "" : tr(STR_SELECT);

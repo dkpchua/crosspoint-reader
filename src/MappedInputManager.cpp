@@ -1,7 +1,6 @@
 #include "MappedInputManager.h"
 
 #include <GfxRenderer.h>
-#include <Logging.h>
 
 #include "BleInput.h"
 #include "CrossPointSettings.h"
@@ -128,50 +127,36 @@ bool MappedInputManager::takeCapturedBleKey(uint8_t& kind, uint8_t& value) {
 void MappedInputManager::pollBle() {
   bleActivityThisFrame = false;
   // Age last frame's press edges into this frame's release edges (the FreeInk host
-  // surfaces presses + synthetic repeats but never releases), then clear presses.
+  // surfaces presses + synthetic repeats but never releases), then clear presses. A
+  // pending release also counts as BLE activity this frame so getHeldTime() reports
+  // zero on the release frame too (page-turn handlers often fire on release).
   for (uint8_t i = 0; i < kButtonCount; i++) {
     bleReleaseEdge[i] = blePressEdge[i];
     blePressEdge[i] = false;
+    if (bleReleaseEdge[i]) bleActivityThisFrame = true;
   }
 
   freeink::KeyEvent ev;
   while (BleHid.popKey(ev)) {
     uint8_t kind = 0xFF;
     uint8_t value = 0;
-    const bool encoded = bleinput::encodeKey(ev, kind, value);
-    // TEMP page-turner bring-up: log every decoded BLE key so the actual keycodes
-    // a remote sends are visible on serial. Remove once mapping is verified.
-    LOG_DBG("BLE", "key ch=%d code=0x%02X special=%u -> kind=%u val=0x%02X enc=%d", ev.ch, ev.keycode,
-            (unsigned)ev.special, kind, value, encoded);
-    if (!encoded) continue;
+    if (!bleinput::encodeKey(ev, kind, value)) continue;
 
     if (bleCaptureMode) {
       bleCapturedKind = kind;
       bleCapturedValue = value;
       bleHasCaptured = true;
-      LOG_DBG("BLE", "captured (capture mode) kind=%u val=0x%02X", kind, value);
       continue;
     }
 
     // Resolve the key identity against the persisted mapping table.
-    bool matched = false;
     for (const auto& e : SETTINGS.bleKeyMap) {
       if (e.button == 0xFF || e.keyKind != kind || e.keyValue != value) continue;
       if (e.button < kButtonCount) {
         blePressEdge[e.button] = true;
         bleActivityThisFrame = true;
-        matched = true;
-        LOG_DBG("BLE", "matched -> logical button %u", e.button);
       }
       break;
-    }
-    if (!matched) {
-      LOG_DBG("BLE", "NO MATCH for kind=%u val=0x%02X; current map:", kind, value);
-      for (uint8_t i = 0; i < CrossPointSettings::BLE_MAP_CAPACITY; i++) {
-        const auto& e = SETTINGS.bleKeyMap[i];
-        if (e.button == 0xFF) continue;
-        LOG_DBG("BLE", "  slot %u: kind=%u val=0x%02X -> button %u", i, e.keyKind, e.keyValue, e.button);
-      }
     }
   }
 }
@@ -180,7 +165,15 @@ bool MappedInputManager::wasAnyPressed() const { return gpio.wasAnyPressed(); }
 
 bool MappedInputManager::wasAnyReleased() const { return gpio.wasAnyReleased(); }
 
-unsigned long MappedInputManager::getHeldTime() const { return gpio.getHeldTime(); }
+unsigned long MappedInputManager::getHeldTime() const {
+  // A BLE-mapped key is a momentary tap with no physical hold (we don't model BLE
+  // press-and-hold). gpio.getHeldTime() returns the *last physical* button's hold
+  // duration, which is stale — if a BLE edge drove input this frame, reporting that
+  // stale value makes a tap look like a long-press (e.g. page tap -> chapter skip).
+  // Report zero in that case so BLE taps are always treated as short presses.
+  if (bleActivityThisFrame) return 0;
+  return gpio.getHeldTime();
+}
 
 MappedInputManager::Labels MappedInputManager::mapLabels(const char* back, const char* confirm, const char* previous,
                                                          const char* next) const {

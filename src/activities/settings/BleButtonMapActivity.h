@@ -39,9 +39,6 @@ class BleButtonMapActivity final : public Activity {
   uint8_t capturedValue = 0;
   int functionIndex = 0;
 
-  // Transient "mapping table full" banner.
-  unsigned long errorUntil = 0;
-
   ButtonNavigator buttonNavigator;
 
   // Bind the captured key to the chosen logical button in SETTINGS.bleKeyMap and
