@@ -18,6 +18,7 @@
 
 #include <cstring>
 
+#include "BleInput.h"
 #include "CrossPointSettings.h"
 #include "CrossPointState.h"
 #include "KOReaderCredentialStore.h"
@@ -262,6 +263,10 @@ void enterDeepSleep(bool fromTimeout = false) {
     WiFi.mode(WIFI_OFF);
   }
 
+  // Drop any BLE HID link cleanly so the page-turner sees the disconnect promptly.
+  // bluetoothEnabled persists, so the setting is restored on the next wake.
+  bleinput::stop();
+
   halTiltSensor.deepSleep();
   display.deepSleep();
   LOG_DBG("MAIN", "Entering deep sleep");
@@ -478,6 +483,15 @@ void setup() {
   // Ensure we're not still holding the power button before leaving setup
   waitForPowerRelease();
   allowSleepAt = millis() + 2000;
+
+  // Restore Bluetooth if it was enabled before sleep/reboot. Deep-sleep wake is a
+  // full chip reset, so NimBLE starts fresh here and auto-reconnects to the bonded
+  // page-turner. Left uninitialised (zero radio/RAM cost) when the setting is off.
+  // ensureStarted() forces normal CPU frequency internally (NimBLE controller init
+  // hangs at the 10 MHz low-power state).
+  if (SETTINGS.bluetoothEnabled) {
+    bleinput::ensureStarted();
+  }
 }
 
 void loop() {
@@ -486,6 +500,8 @@ void loop() {
   static unsigned long lastMemPrint = 0;
 
   gpio.update();
+  BleHid.poll();                  // drive BLE auto-reconnect + key auto-repeat (no-op when BT off)
+  mappedInputManager.pollBle();   // drain BLE keys -> logical-button overlay for this frame
   halTiltSensor.update(SETTINGS.tiltPageTurn, SETTINGS.orientation, activityManager.isReaderActivity());
 
   renderer.setFadingFix(SETTINGS.fadingFix);
@@ -516,7 +532,7 @@ void loop() {
   // Check for any user activity (button press or release) or active background work
   static unsigned long lastActivityTime = millis();
   if (gpio.wasAnyPressed() || gpio.wasAnyReleased() || halTiltSensor.hadActivity() ||
-      activityManager.preventAutoSleep()) {
+      mappedInputManager.bleHadActivityThisFrame() || activityManager.preventAutoSleep()) {
     lastActivityTime = millis();         // Reset inactivity timer
     powerManager.setPowerSaving(false);  // Restore normal CPU frequency on user activity
   }
@@ -597,11 +613,16 @@ void loop() {
     powerManager.setPowerSaving(false);  // Make sure we're at full performance when skipLoopDelay is requested
     yield();                             // Give FreeRTOS a chance to run tasks, but return immediately
   } else {
-    if (millis() - lastActivityTime >= HalPowerManager::IDLE_POWER_SAVING_MS) {
+    // The BLE controller cannot run at the 10 MHz low-power frequency — NimBLE's
+    // controller reset/maintenance hangs the radio and trips the interrupt WDT (the
+    // same reason WiFi force-disables power saving in HalPowerManager). Keep full CPU
+    // speed whenever Bluetooth is enabled, regardless of input idleness.
+    if (!SETTINGS.bluetoothEnabled && millis() - lastActivityTime >= HalPowerManager::IDLE_POWER_SAVING_MS) {
       // If we've been inactive for a while, increase the delay to save power
       powerManager.setPowerSaving(true);  // Lower CPU frequency after extended inactivity
       delay(50);
     } else {
+      if (SETTINGS.bluetoothEnabled) powerManager.setPowerSaving(false);  // keep the BLE radio stable
       // Short delay to prevent tight loop while still being responsive
       delay(10);
     }

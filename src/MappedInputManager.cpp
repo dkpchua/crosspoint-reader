@@ -1,7 +1,9 @@
 #include "MappedInputManager.h"
 
 #include <GfxRenderer.h>
+#include <Logging.h>
 
+#include "BleInput.h"
 #include "CrossPointSettings.h"
 
 bool MappedInputManager::isNavDirectionSwapped() const {
@@ -74,11 +76,105 @@ bool MappedInputManager::mapButton(const Button button, bool (HalGPIO::*fn)(uint
   return false;
 }
 
-bool MappedInputManager::wasPressed(const Button button) const { return mapButton(button, &HalGPIO::wasPressed); }
+bool MappedInputManager::bleEdge(const bool* arr, const Button button) const {
+  // Mirror mapButton()'s composite navigation handling so a BLE key bound to a
+  // physical direction also satisfies the derived NavNext / NavPrevious logical
+  // buttons (used by list navigation), respecting the orientation axis flip.
+  switch (button) {
+    case Button::NavNext:
+      return isNavDirectionSwapped() ? (arr[(int)Button::Up] || arr[(int)Button::Left])
+                                     : (arr[(int)Button::Down] || arr[(int)Button::Right]);
+    case Button::NavPrevious:
+      return isNavDirectionSwapped() ? (arr[(int)Button::Down] || arr[(int)Button::Right])
+                                     : (arr[(int)Button::Up] || arr[(int)Button::Left]);
+    default:
+      return arr[(int)button];
+  }
+}
 
-bool MappedInputManager::wasReleased(const Button button) const { return mapButton(button, &HalGPIO::wasReleased); }
+bool MappedInputManager::wasPressed(const Button button) const {
+  return mapButton(button, &HalGPIO::wasPressed) || bleEdge(blePressEdge, button);
+}
 
-bool MappedInputManager::isPressed(const Button button) const { return mapButton(button, &HalGPIO::isPressed); }
+bool MappedInputManager::wasReleased(const Button button) const {
+  return mapButton(button, &HalGPIO::wasReleased) || bleEdge(bleReleaseEdge, button);
+}
+
+bool MappedInputManager::isPressed(const Button button) const {
+  // A BLE tap is momentary: report "pressed" only on the press-edge frame.
+  return mapButton(button, &HalGPIO::isPressed) || bleEdge(blePressEdge, button);
+}
+
+void MappedInputManager::setBleCaptureMode(const bool on) {
+  bleCaptureMode = on;
+  bleHasCaptured = false;
+  if (on) {
+    // Clear any stale overlay so a held remote key doesn't leak into the UI.
+    for (uint8_t i = 0; i < kButtonCount; i++) {
+      blePressEdge[i] = false;
+      bleReleaseEdge[i] = false;
+    }
+  }
+}
+
+bool MappedInputManager::takeCapturedBleKey(uint8_t& kind, uint8_t& value) {
+  if (!bleHasCaptured) return false;
+  kind = bleCapturedKind;
+  value = bleCapturedValue;
+  bleHasCaptured = false;
+  return true;
+}
+
+void MappedInputManager::pollBle() {
+  bleActivityThisFrame = false;
+  // Age last frame's press edges into this frame's release edges (the FreeInk host
+  // surfaces presses + synthetic repeats but never releases), then clear presses.
+  for (uint8_t i = 0; i < kButtonCount; i++) {
+    bleReleaseEdge[i] = blePressEdge[i];
+    blePressEdge[i] = false;
+  }
+
+  freeink::KeyEvent ev;
+  while (BleHid.popKey(ev)) {
+    uint8_t kind = 0xFF;
+    uint8_t value = 0;
+    const bool encoded = bleinput::encodeKey(ev, kind, value);
+    // TEMP page-turner bring-up: log every decoded BLE key so the actual keycodes
+    // a remote sends are visible on serial. Remove once mapping is verified.
+    LOG_DBG("BLE", "key ch=%d code=0x%02X special=%u -> kind=%u val=0x%02X enc=%d", ev.ch, ev.keycode,
+            (unsigned)ev.special, kind, value, encoded);
+    if (!encoded) continue;
+
+    if (bleCaptureMode) {
+      bleCapturedKind = kind;
+      bleCapturedValue = value;
+      bleHasCaptured = true;
+      LOG_DBG("BLE", "captured (capture mode) kind=%u val=0x%02X", kind, value);
+      continue;
+    }
+
+    // Resolve the key identity against the persisted mapping table.
+    bool matched = false;
+    for (const auto& e : SETTINGS.bleKeyMap) {
+      if (e.button == 0xFF || e.keyKind != kind || e.keyValue != value) continue;
+      if (e.button < kButtonCount) {
+        blePressEdge[e.button] = true;
+        bleActivityThisFrame = true;
+        matched = true;
+        LOG_DBG("BLE", "matched -> logical button %u", e.button);
+      }
+      break;
+    }
+    if (!matched) {
+      LOG_DBG("BLE", "NO MATCH for kind=%u val=0x%02X; current map:", kind, value);
+      for (uint8_t i = 0; i < CrossPointSettings::BLE_MAP_CAPACITY; i++) {
+        const auto& e = SETTINGS.bleKeyMap[i];
+        if (e.button == 0xFF) continue;
+        LOG_DBG("BLE", "  slot %u: kind=%u val=0x%02X -> button %u", i, e.keyKind, e.keyValue, e.button);
+      }
+    }
+  }
+}
 
 bool MappedInputManager::wasAnyPressed() const { return gpio.wasAnyPressed(); }
 
