@@ -198,9 +198,9 @@ void ClockOffsetActivity::loop() {
     return;
   }
 
-  int tx = 0;
-  int ty = 0;
   if (mappedInput.hasTouch()) {
+    int tx = 0;
+    int ty = 0;
     Rect minusRect;
     Rect plusRect;
     getTouchControlRects(minusRect, plusRect);
