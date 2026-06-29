@@ -1,5 +1,7 @@
 #pragma once
 
+#include <GfxRenderer.h>
+
 #include "activities/Activity.h"
 #include "util/ButtonNavigator.h"
 
@@ -34,4 +36,5 @@ class ClockOffsetActivity final : public Activity {
   void saveToSettings() const;
   void adjustActiveField(int delta);
   void clampForSign();
+  bool fieldFromPoint(int x, int y, Field& field) const;
 };

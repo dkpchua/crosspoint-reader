@@ -108,6 +108,45 @@ void ClockOffsetActivity::adjustActiveField(int delta) {
   }
 }
 
+bool ClockOffsetActivity::fieldFromPoint(const int x, const int y, Field& field) const {
+  const auto pageWidth = renderer.getScreenWidth();
+  const auto pageHeight = renderer.getScreenHeight();
+  const int centreY = pageHeight / 2 - 40;
+  auto widthOf = [&](const char* s) { return renderer.getTextWidth(UI_12_FONT_ID, s, EpdFontFamily::BOLD); };
+  constexpr int fieldPaddingX = 6;
+  constexpr int labelGap = 16;
+  constexpr int fieldGap = 12;
+  constexpr int colonGap = 5;
+  const int lineHeight = renderer.getLineHeight(UI_12_FONT_ID);
+  const int fieldHeight = lineHeight + 2;
+
+  const int labelWidth = widthOf("UTC");
+  const int signBoxW = std::max(widthOf("+"), widthOf("-")) + fieldPaddingX * 2;
+  const int hoursBoxW = std::max(widthOf("14"), widthOf("12")) + fieldPaddingX * 2;
+  const int colonWidth = widthOf(":");
+  const int minutesBoxW = std::max({widthOf("00"), widthOf("15"), widthOf("30"), widthOf("45")}) + fieldPaddingX * 2;
+  const int totalWidth =
+      labelWidth + labelGap + signBoxW + fieldGap + hoursBoxW + colonGap + colonWidth + colonGap + minutesBoxW;
+
+  int boxX = (pageWidth - totalWidth) / 2 + labelWidth + labelGap;
+  auto hit = [&](const int width) { return x >= boxX && x < boxX + width && y >= centreY && y < centreY + fieldHeight; };
+  if (hit(signBoxW)) {
+    field = FIELD_SIGN;
+    return true;
+  }
+  boxX += signBoxW + fieldGap;
+  if (hit(hoursBoxW)) {
+    field = FIELD_HOURS;
+    return true;
+  }
+  boxX += hoursBoxW + colonGap + colonWidth + colonGap;
+  if (hit(minutesBoxW)) {
+    field = FIELD_MINUTES;
+    return true;
+  }
+  return false;
+}
+
 void ClockOffsetActivity::loop() {
   if (mappedInput.wasPressed(MappedInputManager::Button::Back)) {
     finish();
@@ -117,6 +156,26 @@ void ClockOffsetActivity::loop() {
   if (mappedInput.wasPressed(MappedInputManager::Button::Confirm)) {
     activeField = static_cast<Field>((activeField + 1) % FIELD_COUNT);
     requestUpdate();
+    return;
+  }
+
+  int tx = 0;
+  int ty = 0;
+  Field touchedField = FIELD_HOURS;
+  if (mappedInput.wasScreenTouchDown(tx, ty) && fieldFromPoint(tx, ty, touchedField)) {
+    if (activeField != touchedField) {
+      activeField = touchedField;
+      requestUpdate();
+    }
+    return;
+  }
+  if (mappedInput.wasScreenTapped(tx, ty) && fieldFromPoint(tx, ty, touchedField)) {
+    if (activeField == touchedField) {
+      adjustActiveField(+1);
+    } else {
+      activeField = touchedField;
+      requestUpdate();
+    }
     return;
   }
 
