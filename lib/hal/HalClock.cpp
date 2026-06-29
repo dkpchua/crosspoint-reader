@@ -19,35 +19,9 @@ static uint8_t decToBcd(uint8_t dec) { return ((dec / 10) << 4) | (dec % 10); }
 
 void HalClock::begin() {
   _usesSdkRtc = false;
-  if (!gpio.deviceIsX3()) {
-    _available = _sdkRtc.begin();
-    _usesSdkRtc = _available;
-    LOG_INF("CLK", _available ? "SDK RTC found" : "RTC not found");
-    return;
-  }
-
-  // I2C is already initialised by HalPowerManager::begin() for X3.
-  // Probe the DS3231 by reading the seconds register.
-  Wire.beginTransmission(I2C_ADDR_DS3231);
-  Wire.write(DS3231_SEC_REG);
-  if (Wire.endTransmission(false) != 0) {
-    LOG_INF("CLK", "DS3231 RTC not found");
-    _available = false;
-    return;
-  }
-  Wire.requestFrom(I2C_ADDR_DS3231, (uint8_t)1);
-  if (Wire.available() < 1) {
-    _available = false;
-    return;
-  }
-  Wire.read();  // discard — just testing connectivity
-
-  _available = true;
-  LOG_INF("CLK", "DS3231 RTC found");
-
-  // Prime the cache with an initial read
-  uint8_t h, m;
-  getTime(h, m);
+  _available = _sdkRtc.begin();
+  _usesSdkRtc = _available;
+  LOG_INF("CLK", _available ? "SDK RTC found" : "RTC not found");
 }
 
 bool HalClock::getTime(uint8_t& hour, uint8_t& minute) const {
