@@ -34,6 +34,9 @@ constexpr int HTTP_TX_BUF = 512;
 constexpr int HTTP_TIMEOUT_MS = 60000;
 constexpr size_t READ_CHUNK = 1024;
 constexpr int MAX_REDIRECTS = 5;
+#if defined(FREEINK_NET_WOLFSSL)
+constexpr size_t MAX_HTTP_HEADER_LINE = 2048;
+#endif
 
 struct Sink {
   std::function<bool(const uint8_t*, size_t)> write;  // returns false to abort the transfer
@@ -98,6 +101,7 @@ bool readLine(Client& client, std::string& line, const unsigned long deadline) {
         if (!line.empty() && line.back() == '\r') line.pop_back();
         return true;
       }
+      if (line.size() >= MAX_HTTP_HEADER_LINE) return false;
       line += static_cast<char>(c);
     }
     if (!client.connected() && client.available() == 0) return false;
@@ -158,6 +162,7 @@ HttpDownloader::DownloadError runGetWolf(const std::string& startUrl, const std:
     const int status = line.size() >= 12 ? atoi(line.c_str() + 9) : 0;
     size_t contentLength = 0;
     std::string location;
+    std::string transferEncoding;
     while (readLine(*client, line, headerDeadline)) {
       if (line.empty()) break;
       const size_t colon = line.find(':');
@@ -169,6 +174,12 @@ HttpDownloader::DownloadError runGetWolf(const std::string& startUrl, const std:
                      [](unsigned char c) { return static_cast<char>(tolower(c)); });
       if (name == "content-length") contentLength = static_cast<size_t>(strtoul(value.c_str(), nullptr, 10));
       if (name == "location") location = value;
+      if (name == "transfer-encoding") {
+        while (!value.empty() && isspace(static_cast<unsigned char>(value.back()))) value.pop_back();
+        std::transform(value.begin(), value.end(), value.begin(),
+                       [](unsigned char c) { return static_cast<char>(tolower(c)); });
+        transferEncoding = value;
+      }
     }
 
     if (isRedirect(status) && !location.empty()) {
@@ -178,6 +189,11 @@ HttpDownloader::DownloadError runGetWolf(const std::string& startUrl, const std:
     }
     if (status != 200) {
       LOG_ERR("HTTP", "wolfSSL unexpected status: %d", status);
+      client->stop();
+      return HttpDownloader::HTTP_ERROR;
+    }
+    if (!transferEncoding.empty() && transferEncoding != "identity") {
+      LOG_ERR("HTTP", "wolfSSL unsupported transfer encoding: %s", transferEncoding.c_str());
       client->stop();
       return HttpDownloader::HTTP_ERROR;
     }
