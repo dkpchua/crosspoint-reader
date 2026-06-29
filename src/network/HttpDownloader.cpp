@@ -12,19 +12,17 @@
 #include <string>
 
 namespace {
-// RX holds the response headers. 4096 fits real OPDS servers; GitHub's release
-// CDN sends more and logs HTTP_HEADER "Buffer length is small", but that's
-// non-fatal: the headers we read (Location, Content-Length) come first and
-// survive. Smaller keeps contiguous heap free while WiFi and TLS are up. TX
-// only carries our GET; the body streams in READ_CHUNK pieces.
-constexpr int HTTP_RX_BUF = 4096;
-constexpr int HTTP_TX_BUF = 1024;
+// RX holds the response headers. Smaller buffers leave enough contiguous heap
+// for mbedTLS on redirect-heavy OPDS feeds while still preserving the headers
+// we read directly (Location, Content-Length).
+constexpr int HTTP_RX_BUF = 2048;
+constexpr int HTTP_TX_BUF = 512;
 // Per-socket-op timeout. Some OPDS download endpoints are slow to send headers
 // (>15s) and chunked catalogs stall mid-body, so 15s killed them. 60s gives
 // slow servers room. esp_http_client's timeout_ms is uint32, so unlike Arduino
 // HTTPClient's uint16 setTimeout it doesn't silently truncate.
 constexpr int HTTP_TIMEOUT_MS = 60000;
-constexpr size_t READ_CHUNK = 2048;
+constexpr size_t READ_CHUNK = 1024;
 
 struct Sink {
   std::function<bool(const uint8_t*, size_t)> write;  // returns false to abort the transfer
@@ -86,6 +84,7 @@ HttpDownloader::DownloadError runGet(const std::string& url, const std::string& 
   int status = esp_http_client_get_status_code(client);
   for (int hop = 0; isRedirect(status) && hop < 5; ++hop) {
     if (esp_http_client_set_redirection(client) != ESP_OK) break;
+    esp_http_client_close(client);
     err = esp_http_client_open(client, 0);
     if (err != ESP_OK) {
       LOG_ERR("HTTP", "redirect open failed: %s", esp_err_to_name(err));
