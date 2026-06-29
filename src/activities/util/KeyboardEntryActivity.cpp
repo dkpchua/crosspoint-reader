@@ -311,7 +311,17 @@ void KeyboardEntryActivity::loop() {
     }
     touchKeyHeld = false;
     touchKeyLongHandled = false;
+    touchKeyStart = 0;
+    touchKeyRow = -1;
+    touchKeyCol = -1;
     return;
+  }
+  if (touchKeyHeld) {
+    touchKeyHeld = false;
+    touchKeyLongHandled = false;
+    touchKeyStart = 0;
+    touchKeyRow = -1;
+    touchKeyCol = -1;
   }
 
   if (!cursorMode && mappedInput.wasPressed(MappedInputManager::Button::Up)) {
@@ -452,7 +462,8 @@ void KeyboardEntryActivity::loop() {
 
   if (confirmHeld && !confirmLongHandled && mappedInput.isPressed(MappedInputManager::Button::Confirm) &&
       mappedInput.getHeldTime() > LONG_PRESS_MS) {
-    if (handleLongPressOnSelectedKey()) {
+    const bool selectedDel = isBottomRow(selectedRow) && selectedCol == static_cast<int>(SpecialKeyType::Del);
+    if (!selectedDel && handleLongPressOnSelectedKey()) {
       requestUpdate();
       confirmLongHandled = true;
     }

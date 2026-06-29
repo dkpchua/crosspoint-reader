@@ -58,6 +58,17 @@ void LanguageSelectActivity::loop() {
   }
 
   const int pageItems = UITheme::getNumberOfItemsPerPage(renderer, true, false, true, false);
+  const auto swipe = mappedInput.wasSwipe();
+  if (swipe == MappedInputManager::SwipeDir::Up) {
+    selectedIndex = ButtonNavigator::nextPageIndex(static_cast<int>(selectedIndex), totalItems, pageItems);
+    requestUpdate();
+    return;
+  }
+  if (swipe == MappedInputManager::SwipeDir::Down) {
+    selectedIndex = ButtonNavigator::previousPageIndex(static_cast<int>(selectedIndex), totalItems, pageItems);
+    requestUpdate();
+    return;
+  }
 
   // Handle navigation
   buttonNavigator.onNextRelease([this] {

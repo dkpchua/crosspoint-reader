@@ -63,6 +63,7 @@ class OptionPopup {
           return true;
         }
       }
+      if (contains(getDialogRect(input.getRenderer()), tx, ty)) return true;
       return true;
     }
     if (input.wasScreenTapped(tx, ty)) {
@@ -76,6 +77,7 @@ class OptionPopup {
           return true;
         }
       }
+      if (contains(getDialogRect(input.getRenderer()), tx, ty)) return true;
       active = false;
       requestUpdate();
       return true;
@@ -165,6 +167,40 @@ class OptionPopup {
   }
 
  private:
+  Rect getDialogRect(const GfxRenderer& renderer) const {
+    if (!active) return Rect{0, 0, 0, 0};
+
+    const auto& metrics = UITheme::getInstance().getMetrics();
+    const auto pageWidth = renderer.getScreenWidth();
+    const auto pageHeight = renderer.getScreenHeight();
+    const int optionFontId = metrics.optionPopupUseSmallFont ? UI_10_FONT_ID : UI_12_FONT_ID;
+    const EpdFontFamily::Style optionStyle =
+        metrics.optionPopupOptionFontBold ? EpdFontFamily::BOLD : EpdFontFamily::REGULAR;
+
+    const int itemSpacing = metrics.optionPopupItemSpacing;
+    const int innerPadding = metrics.optionPopupInnerPadding;
+    const int selectionHPadding = metrics.optionPopupSelectionHPadding;
+    const int selectionVPadding = metrics.optionPopupSelectionVPadding;
+
+    const int optionLineHeight = renderer.getLineHeight(optionFontId);
+    const int titleLineHeight = renderer.getLineHeight(UI_12_FONT_ID);
+    const int rowHeight = optionLineHeight + selectionVPadding * 2;
+
+    int maxTextWidth = renderer.getTextWidth(UI_12_FONT_ID, title.c_str(), EpdFontFamily::BOLD);
+    for (const auto& opt : ownedStrings) {
+      const int width = renderer.getTextWidth(optionFontId, opt.c_str(), optionStyle);
+      if (width > maxTextWidth) maxTextWidth = width;
+    }
+
+    const int optionCount = static_cast<int>(ownedStrings.size());
+    const int listHeight = rowHeight * optionCount + itemSpacing * (optionCount - 1);
+    const int dialogW = std::min((maxTextWidth + innerPadding * 2 + selectionHPadding * 2) * 12 / 10,
+                                 pageWidth - metrics.optionPopupDialogSideMargin * 2);
+    const int contentHeight = titleLineHeight + metrics.optionPopupTitleGap + listHeight;
+    const int dialogH = contentHeight + innerPadding * 2;
+    return Rect{(pageWidth - dialogW) / 2, (pageHeight - dialogH) / 2, dialogW, dialogH};
+  }
+
   static bool contains(const Rect& rect, const int x, const int y) {
     return x >= rect.x && x < rect.x + rect.width && y >= rect.y && y < rect.y + rect.height;
   }

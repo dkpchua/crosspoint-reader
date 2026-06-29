@@ -95,12 +95,12 @@ uint16_t HalPowerManager::getBatteryPercentage() const {
       return _batteryCachedPercent;
     }
 
+    _batteryLastPollMs = now;
     uint16_t percent = 0;
     if (!battery.readPercentageChecked(percent)) {
       return _batteryCachedPercent;
     }
     _batteryCachedPercent = percent;
-    _batteryLastPollMs = now;
     return _batteryCachedPercent;
   }
 

@@ -181,6 +181,9 @@ void BmpViewerActivity::loop() {
   Activity::loop();
 
   auto openSibling = [this](const int delta) {
+    if (currentImageIndex < 0) {
+      return false;
+    }
     const int nextIndex = currentImageIndex + delta;
     if (siblingImages.size() <= 1 || nextIndex < 0 || nextIndex >= static_cast<int>(siblingImages.size())) {
       return false;

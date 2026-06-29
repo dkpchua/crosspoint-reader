@@ -131,6 +131,7 @@ bool MappedInputManager::listItemFromPoint(const int x, const int y, int& index,
   if (rowStep <= 0) return false;
 
   const int pageItems = theme.getListPageItems(listHeight, hasSubtitle);
+  if (pageItems <= 0) return false;
   const int pageStart = std::max(0, selectedIndex / pageItems) * pageItems;
   const int row = (y - listTop) / rowStep;
   const int tapped = pageStart + row;

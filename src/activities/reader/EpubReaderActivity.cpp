@@ -267,9 +267,11 @@ void EpubReaderActivity::loop() {
     pendingReadFolderMove = false;
   }
 
+  const auto touch = ReaderUtils::detectTouchPageTurn(renderer, mappedInput);
+
   if (automaticPageTurnActive) {
     if (mappedInput.wasReleased(MappedInputManager::Button::Confirm) ||
-        mappedInput.wasReleased(MappedInputManager::Button::Back)) {
+        mappedInput.wasReleased(MappedInputManager::Button::Back) || ReaderUtils::isTouchMenuGesture(touch)) {
       automaticPageTurnActive = false;
       // updates chapter title space to indicate page turn disabled
       requestUpdate();
@@ -297,8 +299,6 @@ void EpubReaderActivity::loop() {
     showBookmarkMessage = false;
     requestUpdate();
   }
-
-  const auto touch = ReaderUtils::detectTouchPageTurn(renderer, mappedInput);
 
   // Enter reader menu activity on short-press Confirm or center touch hold. A long-press that fired a bound
   // function (bookmark or KOReader sync) sets ignoreNextConfirmRelease so the release

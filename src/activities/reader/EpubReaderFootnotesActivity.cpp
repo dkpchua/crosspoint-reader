@@ -50,7 +50,7 @@ void EpubReaderFootnotesActivity::loop() {
     const int contentY = isPortraitInverted ? 50 : 0;
     constexpr int lineHeight = 36;
     const int listTop = 60 + contentY;
-    const int visibleCount = std::max(1, (renderer.getScreenHeight() - contentY) / lineHeight);
+    const int visibleCount = std::max(1, (renderer.getScreenHeight() - listTop) / lineHeight);
     int tx = 0;
     int ty = 0;
     if (mappedInput.wasScreenTouchDown(tx, ty) && tx >= contentX && tx < contentX + contentWidth && ty >= listTop) {
@@ -136,13 +136,14 @@ void EpubReaderFootnotesActivity::render(RenderLock&&) {
   constexpr int lineHeight = 36;
   const int screenWidth = renderer.getScreenWidth();
   const int marginLeft = contentX + 20;
+  const int listTop = 60 + contentY;
 
-  const int visibleCount = std::max(1, (renderer.getScreenHeight() - contentY) / lineHeight);
+  const int visibleCount = std::max(1, (renderer.getScreenHeight() - listTop) / lineHeight);
   if (selectedIndex < scrollOffset) scrollOffset = selectedIndex;
   if (selectedIndex >= scrollOffset + visibleCount) scrollOffset = selectedIndex - visibleCount + 1;
 
   for (int i = scrollOffset; i < static_cast<int>(footnotes.size()) && i < scrollOffset + visibleCount; i++) {
-    const int y = 60 + contentY + (i - scrollOffset) * lineHeight;
+    const int y = listTop + (i - scrollOffset) * lineHeight;
     const bool isSelected = (i == selectedIndex);
 
     if (isSelected) {
