@@ -7,9 +7,18 @@
 #include <esp_crt_bundle.h>
 #include <esp_http_client.h>
 
+#include <cctype>
+#include <cstdlib>
 #include <cstring>
 #include <functional>
 #include <string>
+
+#if defined(FREEINK_NET_WOLFSSL)
+#include <SecureClient.h>
+#include <WiFiClient.h>
+
+extern "C" void wolfSSL_Arduino_Serial_Print(const char* const) {}
+#endif
 
 namespace {
 // RX holds the response headers. Smaller buffers leave enough contiguous heap
@@ -23,6 +32,7 @@ constexpr int HTTP_TX_BUF = 512;
 // HTTPClient's uint16 setTimeout it doesn't silently truncate.
 constexpr int HTTP_TIMEOUT_MS = 60000;
 constexpr size_t READ_CHUNK = 1024;
+constexpr int MAX_REDIRECTS = 5;
 
 struct Sink {
   std::function<bool(const uint8_t*, size_t)> write;  // returns false to abort the transfer
@@ -35,6 +45,189 @@ struct Sink {
 bool isRedirect(int status) {
   return status == 301 || status == 302 || status == 303 || status == 307 || status == 308;
 }
+
+#if defined(FREEINK_NET_WOLFSSL)
+struct ParsedUrl {
+  std::string scheme;
+  std::string host;
+  std::string path;
+  uint16_t port = 0;
+};
+
+bool parseUrl(const std::string& url, ParsedUrl& parsed) {
+  const size_t schemeEnd = url.find("://");
+  if (schemeEnd == std::string::npos) return false;
+  parsed.scheme = url.substr(0, schemeEnd);
+  const size_t hostStart = schemeEnd + 3;
+  const size_t pathStart = url.find('/', hostStart);
+  const std::string hostPort = pathStart == std::string::npos ? url.substr(hostStart) : url.substr(hostStart, pathStart - hostStart);
+  parsed.path = pathStart == std::string::npos ? "/" : url.substr(pathStart);
+  const size_t portSep = hostPort.rfind(':');
+  if (portSep != std::string::npos) {
+    parsed.host = hostPort.substr(0, portSep);
+    parsed.port = static_cast<uint16_t>(atoi(hostPort.substr(portSep + 1).c_str()));
+  } else {
+    parsed.host = hostPort;
+    parsed.port = parsed.scheme == "https" ? 443 : 80;
+  }
+  return !parsed.host.empty() && (parsed.scheme == "http" || parsed.scheme == "https");
+}
+
+std::string resolveRedirectUrl(const ParsedUrl& base, const std::string& location) {
+  if (location.find("://") != std::string::npos) return location;
+  if (!location.empty() && location[0] == '/') {
+    return base.scheme + "://" + base.host + (base.port == 80 || base.port == 443 ? "" : ":" + std::to_string(base.port)) +
+           location;
+  }
+  std::string parent = base.path;
+  const size_t slash = parent.rfind('/');
+  parent = slash == std::string::npos ? "/" : parent.substr(0, slash + 1);
+  return base.scheme + "://" + base.host + (base.port == 80 || base.port == 443 ? "" : ":" + std::to_string(base.port)) +
+         parent + location;
+}
+
+bool readLine(Client& client, std::string& line, const unsigned long deadline) {
+  line.clear();
+  while (static_cast<int32_t>(millis() - deadline) < 0) {
+    while (client.available() > 0) {
+      const int c = client.read();
+      if (c < 0) break;
+      if (c == '\n') {
+        if (!line.empty() && line.back() == '\r') line.pop_back();
+        return true;
+      }
+      line += static_cast<char>(c);
+    }
+    if (!client.connected() && client.available() == 0) return false;
+    delay(1);
+  }
+  return false;
+}
+
+HttpDownloader::DownloadError runGetWolf(const std::string& startUrl, const std::string& username,
+                                         const std::string& password, Sink& sink) {
+  std::string url = startUrl;
+  auto buf = makeUniqueNoThrow<uint8_t[]>(READ_CHUNK);
+  if (!buf) {
+    LOG_ERR("HTTP", "OOM: %u byte wolfSSL read buffer", (unsigned)READ_CHUNK);
+    return HttpDownloader::HTTP_ERROR;
+  }
+
+  for (int hop = 0; hop <= MAX_REDIRECTS; ++hop) {
+    ParsedUrl parsed;
+    if (!parseUrl(url, parsed)) {
+      LOG_ERR("HTTP", "wolfSSL bad URL: %s", url.c_str());
+      return HttpDownloader::HTTP_ERROR;
+    }
+
+    WiFiClient plainClient;
+    freeink::SecureClient secureClient;
+    Client* client = nullptr;
+    if (parsed.scheme == "https") {
+      secureClient.setInsecure();
+      client = &secureClient;
+      LOG_DBG("HTTP", "wolfSSL GET: %s", url.c_str());
+    } else {
+      client = &plainClient;
+    }
+    client->setTimeout(HTTP_TIMEOUT_MS / 1000);
+    if (!client->connect(parsed.host.c_str(), parsed.port)) {
+      LOG_ERR("HTTP", "wolfSSL connect failed: %s:%u", parsed.host.c_str(), parsed.port);
+      return HttpDownloader::HTTP_ERROR;
+    }
+
+    std::string request = "GET " + parsed.path + " HTTP/1.1\r\nHost: " + parsed.host +
+                          "\r\nUser-Agent: CrossPoint-ESP32-" CROSSPOINT_VERSION "\r\nConnection: close\r\n";
+    if (!username.empty() && !password.empty()) {
+      const std::string credentials = username + ":" + password;
+      const String encoded = base64::encode(credentials.c_str());
+      request += "Authorization: Basic " + std::string(encoded.c_str()) + "\r\n";
+    }
+    request += "\r\n";
+    client->write(reinterpret_cast<const uint8_t*>(request.c_str()), request.size());
+
+    const unsigned long headerDeadline = millis() + HTTP_TIMEOUT_MS;
+    std::string line;
+    if (!readLine(*client, line, headerDeadline)) {
+      LOG_ERR("HTTP", "wolfSSL no status line");
+      client->stop();
+      return HttpDownloader::HTTP_ERROR;
+    }
+    const int status = line.size() >= 12 ? atoi(line.c_str() + 9) : 0;
+    size_t contentLength = 0;
+    std::string location;
+    while (readLine(*client, line, headerDeadline)) {
+      if (line.empty()) break;
+      const size_t colon = line.find(':');
+      if (colon == std::string::npos) continue;
+      std::string name = line.substr(0, colon);
+      std::string value = line.substr(colon + 1);
+      while (!value.empty() && value.front() == ' ') value.erase(value.begin());
+      for (char& c : name) c = static_cast<char>(tolower(c));
+      if (name == "content-length") contentLength = static_cast<size_t>(strtoul(value.c_str(), nullptr, 10));
+      if (name == "location") location = value;
+    }
+
+    if (isRedirect(status) && !location.empty()) {
+      url = resolveRedirectUrl(parsed, location);
+      client->stop();
+      continue;
+    }
+    if (status != 200) {
+      LOG_ERR("HTTP", "wolfSSL unexpected status: %d", status);
+      client->stop();
+      return HttpDownloader::HTTP_ERROR;
+    }
+
+    sink.total = contentLength;
+    unsigned long readDeadline = millis() + HTTP_TIMEOUT_MS;
+    while (sink.total == 0 || sink.downloaded < sink.total) {
+      if (sink.cancelFlag && *sink.cancelFlag) {
+        client->stop();
+        return HttpDownloader::ABORTED;
+      }
+      if (client->available() <= 0) {
+        if (!client->connected()) break;
+        if (static_cast<int32_t>(millis() - readDeadline) >= 0) {
+          LOG_ERR("HTTP", "wolfSSL read timeout after %zu bytes", sink.downloaded);
+          client->stop();
+          return HttpDownloader::HTTP_ERROR;
+        }
+        delay(1);
+        continue;
+      }
+      const int read = client->read(buf.get(), READ_CHUNK);
+      if (read <= 0) {
+        // SecureClient exposes wolfSSL WANT_READ/WANT_WRITE as a non-positive
+        // Client::read() result. Keep polling until data, close, or timeout.
+        if (!client->connected() && client->available() == 0) break;
+        if (static_cast<int32_t>(millis() - readDeadline) >= 0) {
+          LOG_ERR("HTTP", "wolfSSL read timeout after %zu bytes", sink.downloaded);
+          client->stop();
+          return HttpDownloader::HTTP_ERROR;
+        }
+        delay(2);
+        continue;
+      }
+      readDeadline = millis() + HTTP_TIMEOUT_MS;
+      if (!sink.write(buf.get(), static_cast<size_t>(read))) {
+        client->stop();
+        return HttpDownloader::FILE_ERROR;
+      }
+      sink.downloaded += static_cast<size_t>(read);
+      if (sink.progress && sink.total > 0) sink.progress(sink.downloaded, sink.total);
+    }
+    client->stop();
+    if (sink.total > 0 && sink.downloaded != sink.total) {
+      LOG_ERR("HTTP", "wolfSSL incomplete: got %zu of %zu bytes", sink.downloaded, sink.total);
+      return HttpDownloader::HTTP_ERROR;
+    }
+    return HttpDownloader::OK;
+  }
+  LOG_ERR("HTTP", "too many redirects");
+  return HttpDownloader::HTTP_ERROR;
+}
+#endif
 
 // Streams a GET body through sink.write in READ_CHUNK pieces. Uses the manual
 // open/fetch_headers/read path rather than esp_http_client_perform(): perform()
@@ -82,7 +275,7 @@ HttpDownloader::DownloadError runGet(const std::string& url, const std::string& 
   }
   int64_t contentLength = esp_http_client_fetch_headers(client);
   int status = esp_http_client_get_status_code(client);
-  for (int hop = 0; isRedirect(status) && hop < 5; ++hop) {
+  for (int hop = 0; isRedirect(status) && hop < MAX_REDIRECTS; ++hop) {
     if (esp_http_client_set_redirection(client) != ESP_OK) break;
     esp_http_client_close(client);
     err = esp_http_client_open(client, 0);
@@ -189,7 +382,12 @@ HttpDownloader::DownloadError HttpDownloader::downloadToFile(const std::string& 
   sink.cancelFlag = cancelFlag;
   sink.write = [&file](const uint8_t* data, size_t len) { return file.write(data, len) == len; };
 
-  const DownloadError result = runGet(url, username, password, sink);
+  const DownloadError result =
+#if defined(FREEINK_NET_WOLFSSL)
+      runGetWolf(url, username, password, sink);
+#else
+      runGet(url, username, password, sink);
+#endif
   // Close before any remove() on the same path; DESTRUCTOR_CLOSES_FILE would
   // otherwise close only after the remove.
   file.close();
