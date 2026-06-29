@@ -192,12 +192,16 @@ HalGPIO::DeviceType detectDeviceTypeWithFingerprint() {
 }  // namespace
 
 void HalGPIO::begin() {
-  inputMgr.begin();
 #if FREEINK_MCU_C3
   SPI.begin(EPD_SCLK, SPI_MISO, EPD_MOSI, EPD_CS);
 
   _deviceType = detectDeviceTypeWithFingerprint();
   BoardConfig::selectDevice(deviceIsX3() ? BoardConfig::Board::XteinkX3 : BoardConfig::Board::XteinkX4);
+
+  if (deviceIsX3()) {
+    Wire.begin(X3_I2C_SDA, X3_I2C_SCL, X3_I2C_FREQ);
+    Wire.setTimeOut(6);
+  }
 
   if (deviceIsX4()) {
     pinMode(BAT_GPIO0, INPUT);
@@ -206,6 +210,7 @@ void HalGPIO::begin() {
 #else
   _deviceType = DeviceType::X4;
 #endif
+  inputMgr.begin();
 }
 
 void HalGPIO::update() {
