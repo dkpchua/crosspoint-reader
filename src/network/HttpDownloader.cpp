@@ -7,8 +7,8 @@
 #include <esp_crt_bundle.h>
 #include <esp_http_client.h>
 
-#include <cctype>
 #include <algorithm>
+#include <cctype>
 #include <cstdlib>
 #include <cstring>
 #include <functional>
@@ -78,17 +78,25 @@ bool parseUrl(const std::string& url, ParsedUrl& parsed) {
   return !parsed.host.empty() && (parsed.scheme == "http" || parsed.scheme == "https");
 }
 
+// Returns "host" when the port matches the scheme's default, otherwise "host:port".
+// Only the scheme's true default is omitted (443 for https, 80 for http) so a custom
+// port that happens to equal the other scheme's default is preserved.
+std::string formatAuthority(const std::string& scheme, const std::string& host, uint16_t port) {
+  const uint16_t defaultPort = scheme == "https" ? 443 : 80;
+  if (port == 0 || port == defaultPort) return host;
+  return host + ":" + std::to_string(port);
+}
+
 std::string resolveRedirectUrl(const ParsedUrl& base, const std::string& location) {
   if (location.find("://") != std::string::npos) return location;
+  const std::string authority = formatAuthority(base.scheme, base.host, base.port);
   if (!location.empty() && location[0] == '/') {
-    return base.scheme + "://" + base.host +
-           (base.port == 80 || base.port == 443 ? "" : ":" + std::to_string(base.port)) + location;
+    return base.scheme + "://" + authority + location;
   }
   std::string parent = base.path;
   const size_t slash = parent.rfind('/');
   parent = slash == std::string::npos ? "/" : parent.substr(0, slash + 1);
-  return base.scheme + "://" + base.host +
-         (base.port == 80 || base.port == 443 ? "" : ":" + std::to_string(base.port)) + parent + location;
+  return base.scheme + "://" + authority + parent + location;
 }
 
 bool readLine(Client& client, std::string& line, const unsigned long deadline) {
@@ -142,7 +150,8 @@ HttpDownloader::DownloadError runGetWolf(const std::string& startUrl, const std:
       return HttpDownloader::HTTP_ERROR;
     }
 
-    std::string request = "GET " + parsed.path + " HTTP/1.1\r\nHost: " + parsed.host +
+    std::string request = "GET " + parsed.path +
+                          " HTTP/1.1\r\nHost: " + formatAuthority(parsed.scheme, parsed.host, parsed.port) +
                           "\r\nUser-Agent: CrossPoint-ESP32-" CROSSPOINT_VERSION "\r\nConnection: close\r\n";
     if (!username.empty() && !password.empty()) {
       const std::string credentials = username + ":" + password;

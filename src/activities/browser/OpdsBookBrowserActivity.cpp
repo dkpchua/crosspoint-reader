@@ -196,8 +196,7 @@ void OpdsBookBrowserActivity::fetchFeed(const std::string& path) {
     return;
   }
 
-  std::string url =
-      (path.find("http") == 0) ? UrlUtils::encodeUnsafeUrlChars(path) : UrlUtils::buildUrl(server.url, path);
+  std::string url = UrlUtils::buildUrl(server.url, path);
   LOG_DBG("OPDS", "Fetching: %s", url.c_str());
   OpdsParser parser;
   {
@@ -291,7 +290,7 @@ void OpdsBookBrowserActivity::downloadBook(const OpdsEntry& book) {
       [this, &lastRenderedPercent, &lastProgressUpdateMs](const size_t downloaded, const size_t total) {
         downloadProgress = downloaded;
         downloadTotal = total;
-        const int percent = total > 0 ? static_cast<int>(downloaded * 100 / total) : 0;
+        const int percent = total > 0 ? static_cast<int>(static_cast<uint64_t>(downloaded) * 100 / total) : 0;
         const unsigned long now = millis();
         if (percent >= 100 || lastRenderedPercent < 0 ||
             percent >= lastRenderedPercent + DOWNLOAD_PROGRESS_STEP_PERCENT ||

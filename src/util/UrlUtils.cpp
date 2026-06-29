@@ -55,7 +55,7 @@ std::string encodeUnsafeUrlChars(const std::string& url) {
       out += url[i + 1];
       out += url[i + 2];
       i += 2;
-    } else if (shouldEncode(c)) {
+    } else if (c == '%' || shouldEncode(c)) {
       char encoded[4];
       snprintf(encoded, sizeof(encoded), "%%%02X", c);
       out += encoded;
