@@ -11,6 +11,7 @@
 #include <algorithm>
 
 #include "CrossPointSettings.h"
+#include "CalendarStore.h"
 #include "FontInstaller.h"
 #include "OpdsServerStore.h"
 #include "SdCardFontSystem.h"
@@ -174,6 +175,10 @@ void CrossPointWebServer::begin() {
   server->on("/api/wifi", HTTP_GET, [this] { handleGetWifiNetworks(); });
   server->on("/api/wifi", HTTP_POST, [this] { handlePostWifiNetwork(); });
   server->on("/api/wifi/delete", HTTP_POST, [this] { handleDeleteWifiNetwork(); });
+
+  // Calendar endpoints
+  server->on("/api/calendar/update", HTTP_POST, [this] { handleCalendarUpdate(); });
+  server->on("/api/calendar/clear", HTTP_POST, [this] { handleCalendarClear(); });
 
   server->onNotFound([this] { handleNotFound(); });
   LOG_DBG("WEB", "[MEM] Free heap after route setup: %d bytes", ESP.getFreeHeap());
@@ -1910,4 +1915,42 @@ void CrossPointWebServer::handleFontDelete() {
     server->send(500, "application/json", "{\"error\":\"Delete failed\"}");
     LOG_ERR("WEB", "Failed to delete font family: %s", familyName);
   }
+}
+
+// ---- Calendar API ----
+
+void CrossPointWebServer::handleCalendarUpdate() {
+  if (!server->hasArg("plain")) {
+    server->send(400, "text/plain", "Missing JSON body");
+    return;
+  }
+
+  const String body = server->arg("plain");
+  LOG_DBG("WEB", "Calendar update received: %zu bytes", body.length());
+
+  if (!CALENDAR_STORE.parseFromJson(body.c_str())) {
+    LOG_ERR("WEB", "Calendar JSON parse failed");
+    server->send(400, "text/plain", "Invalid calendar JSON");
+    return;
+  }
+
+  LOG_DBG("WEB", "Calendar parsed: %zu events for %s, saving to SD...",
+          CALENDAR_STORE.getEvents().size(), CALENDAR_STORE.getDate().c_str());
+
+  const String saveError = CALENDAR_STORE.saveToFile();
+  if (!saveError.isEmpty()) {
+    LOG_ERR("WEB", "Calendar save failed: %s", saveError.c_str());
+    server->send(500, "text/plain", saveError);
+    return;
+  }
+
+  LOG_DBG("WEB", "Calendar updated: %zu events for %s", CALENDAR_STORE.getEvents().size(),
+          CALENDAR_STORE.getDate().c_str());
+  server->send(200, "text/plain", "OK");
+}
+
+void CrossPointWebServer::handleCalendarClear() {
+  CALENDAR_STORE.clear();
+  LOG_DBG("WEB", "Calendar data cleared via API");
+  server->send(200, "text/plain", "OK");
 }

@@ -302,6 +302,7 @@
 
   <div id="wifi-container"></div>
   <div id="opds-container"></div>
+  <div id="calendar-container"></div>
 
   <div class="card">
     <p style="text-align: center; color: #95a5a6; margin: 0;">
@@ -827,6 +828,75 @@
 
   loadWifiNetworks();
   loadOpdsServers();
+  loadCalendarStatus();
+
+  // --- Calendar Sync ---
+  // Renders a card for pushing calendar JSON to the reader and clearing it.
+  function renderCalendarSection() {
+    const container = document.getElementById('calendar-container');
+    let html = '<div class="card"><h2>Calendar Sync</h2>';
+    html += '<p style="color:var(--label-color);font-size:0.9em;margin-bottom:12px;">' +
+      'Push today\u2019s calendar events to display on the sleep screen. ' +
+      'Set Sleep Screen to \u201CCalendar\u201D in Display settings above.' +
+      '</p>';
+    html += '<div class="setting-row" style="align-items:flex-start;">' +
+      '<span class="setting-name">Calendar JSON</span>' +
+      '<span class="setting-control"><textarea id="calendar-json" rows="10" ' +
+      'style="width:320px;font-family:monospace;font-size:0.85em;padding:6px 10px;border:1px solid #ddd;border-radius:4px;background:var(--card-bg);"' +
+      ' placeholder=\'{"date":"2026-07-01","events":[{"start":"09:00","end":"10:30","title":"Project Sync","location":"Room A"}]}\'></textarea></span>' +
+      '</div>';
+    html += '<div class="opds-actions">' +
+      '<button class="btn-small btn-save-server" onclick="pushCalendar()">Push Calendar</button>' +
+      '<button class="btn-small btn-delete" onclick="clearCalendar()">Clear Calendar Data</button>' +
+      '</div>';
+    html += '</div>';
+    container.innerHTML = html;
+  }
+
+  async function loadCalendarStatus() {
+    renderCalendarSection();
+  }
+
+  async function pushCalendar() {
+    const ta = document.getElementById('calendar-json');
+    const raw = ta.value.trim();
+    if (!raw) {
+      showMessage('Calendar JSON is empty.', true);
+      return;
+    }
+    try {
+      JSON.parse(raw);
+    } catch (e) {
+      showMessage('Invalid JSON: ' + e.message, true);
+      return;
+    }
+    try {
+      const resp = await fetch('/api/calendar/update', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: raw
+      });
+      if (!resp.ok) throw new Error(await resp.text());
+      showMessage('Calendar data pushed successfully!', false);
+    } catch (e) {
+      showMessage('Error: ' + e.message, true);
+    }
+  }
+
+  async function clearCalendar() {
+    if (!confirm('Clear all calendar data from the reader?')) return;
+    try {
+      const resp = await fetch('/api/calendar/clear', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'}
+      });
+      if (!resp.ok) throw new Error(await resp.text());
+      showMessage('Calendar data cleared.', false);
+      document.getElementById('calendar-json').value = '';
+    } catch (e) {
+      showMessage('Error: ' + e.message, true);
+    }
+  }
 </script>
 </body>
 </html>
