@@ -352,7 +352,7 @@ void SleepActivity::renderCalendarSleepScreen() const {
                               EpdFontFamily::BOLD);
     renderer.drawCenteredText(SMALL_FONT_ID, pageHeight / 2 + 20, tr(STR_CALENDAR));
     renderer.invertScreen();
-    renderer.displayBuffer(HalDisplay::HALF_REFRESH);
+    renderer.displayBuffer(HalDisplay::FULL_REFRESH);
     return;
   }
 
@@ -376,7 +376,7 @@ void SleepActivity::renderCalendarSleepScreen() const {
   if (events.empty()) {
     renderer.drawCenteredText(UI_10_FONT_ID, pageHeight / 2, tr(STR_NO_EVENTS_TODAY));
     renderer.invertScreen();
-    renderer.displayBuffer(HalDisplay::HALF_REFRESH);
+    renderer.displayBuffer(HalDisplay::FULL_REFRESH);
     return;
   }
 
@@ -409,5 +409,5 @@ void SleepActivity::renderCalendarSleepScreen() const {
   }
 
   renderer.invertScreen();
-  renderer.displayBuffer(HalDisplay::HALF_REFRESH);
+  renderer.displayBuffer(HalDisplay::FULL_REFRESH);
 }
