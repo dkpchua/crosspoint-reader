@@ -436,7 +436,7 @@ void SleepActivity::renderCalendarSleepScreen() const {
   if (!timedEvents.empty()) {
     if (y + locH + 4 <= pageHeight - margin) {
       renderer.drawText(SMALL_FONT_ID, margin, y, "TIMELINE", true, EpdFontFamily::BOLD);
-      y += locH + 4;
+      y += locH + 8;
       renderer.drawLine(margin, y, pageWidth - margin, y, true);
       y += 8;
     }
@@ -459,9 +459,9 @@ void SleepActivity::renderCalendarSleepScreen() const {
 
       // Event block
       renderer.drawRect(timelineX + 14, y, timelineEndX - timelineX - 14, eventH, true);
-      renderer.drawText(UI_10_FONT_ID, timelineX + 22, y + 4, e->title.c_str(), true);
+      renderer.drawText(UI_10_FONT_ID, timelineX + 22, y + 6, e->title.c_str(), true);
       if (!e->location.empty()) {
-        renderer.drawText(SMALL_FONT_ID, timelineX + 22, y + 4 + lineH, e->location.c_str(), false);
+        renderer.drawText(SMALL_FONT_ID, timelineX + 22, y + 6 + lineH, e->location.c_str(), false);
       }
 
       y += eventH + 4;
