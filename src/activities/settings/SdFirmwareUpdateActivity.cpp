@@ -251,5 +251,9 @@ void SdFirmwareUpdateActivity::render(RenderLock&&) {
     }
   }
 
-  renderer.displayBuffer();
+  if (state == State::SUCCESS) {
+    renderer.displayBuffer(HalDisplay::FULL_REFRESH);
+  } else {
+    renderer.displayBuffer();
+  }
 }

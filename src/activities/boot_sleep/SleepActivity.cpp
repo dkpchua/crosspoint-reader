@@ -347,6 +347,10 @@ void SleepActivity::renderCalendarSleepScreen() const {
 
   renderer.clearScreen();
 
+  // Pre-clear: full refresh an empty screen to flush any residual ghosting
+  renderer.displayBuffer(HalDisplay::FULL_REFRESH);
+  renderer.clearScreen();
+
   if (!CALENDAR_STORE.hasData()) {
     renderer.drawCenteredText(UI_12_FONT_ID, pageHeight / 2 - 10, tr(STR_CALENDAR_DATA_MISSING), true,
                               EpdFontFamily::BOLD);
@@ -357,55 +361,115 @@ void SleepActivity::renderCalendarSleepScreen() const {
   }
 
   const auto& events = CALENDAR_STORE.getEvents();
-  const auto& date = CALENDAR_STORE.getDate();
+  const auto& dateStr = CALENDAR_STORE.getDate();
 
   const int margin = 20;
-  const int timeColWidth = 115;
-  const int lineSpacing = 22;
-  const int locSpacing = 16;
-  const int eventGap = 8;
+  const int timeColW = 60;
+  const int lineH = 20;
+  const int locH = 15;
+  const int sectionGap = 10;
+
+  // --- Parse date string "YYYY-MM-DD" to "WEEKDAY, D MONTH YYYY" ---
+  static const char* dayNames[] = {"SUNDAY", "MONDAY", "TUESDAY", "WEDNESDAY", "THURSDAY", "FRIDAY", "SATURDAY"};
+  static const char* monthNames[] = {"JANUARY", "FEBRUARY", "MARCH", "APRIL", "MAY", "JUNE",
+                                     "JULY",   "AUGUST",   "SEPTEMBER", "OCTOBER", "NOVEMBER", "DECEMBER"};
+  char dateHeader[48] = {0};
+  int year = 0, month = 0, day = 0;
+  if (sscanf(dateStr.c_str(), "%d-%d-%d", &year, &month, &day) == 3 && year >= 1900 && month >= 1 && month <= 12 &&
+      day >= 1 && day <= 31) {
+    // Zeller's congruence for day of week (0=Saturday)
+    int m = month;
+    int y = year;
+    if (m < 3) { m += 12; y -= 1; }
+    int k = y % 100;
+    int j = y / 100;
+    int dow = (day + 13 * (m + 1) / 5 + k + k / 4 + j / 4 + 5 * j) % 7;
+    // Convert: 0=Sat -> 6, 1=Sun -> 0, 2=Mon -> 1, etc.
+    dow = (dow + 6) % 7;
+    snprintf(dateHeader, sizeof(dateHeader), "%s, %d %s %d", dayNames[dow], day, monthNames[month - 1], year);
+  } else {
+    snprintf(dateHeader, sizeof(dateHeader), "%s", dateStr.c_str());
+  }
+
+  // --- Separate all-day and timed events ---
+  std::vector<const CalendarEvent*> allDayEvents;
+  std::vector<const CalendarEvent*> timedEvents;
+  for (const auto& e : events) {
+    if (e.allDay) {
+      allDayEvents.push_back(&e);
+    } else {
+      timedEvents.push_back(&e);
+    }
+  }
 
   int y = margin;
 
-  renderer.drawText(UI_12_FONT_ID, margin, y, date.c_str(), true, EpdFontFamily::BOLD);
-  y += renderer.getTextHeight(UI_12_FONT_ID) + 8;
-
+  // --- Date header ---
+  renderer.drawText(UI_12_FONT_ID, margin, y, dateHeader, true, EpdFontFamily::BOLD);
+  y += renderer.getTextHeight(UI_12_FONT_ID) + 6;
   renderer.drawLine(margin, y, pageWidth - margin, y, true);
-  y += 12;
+  y += sectionGap + 4;
+
+  // --- All-day events section ---
+  if (!allDayEvents.empty()) {
+    renderer.drawText(SMALL_FONT_ID, margin, y, "ALL-DAY", true, EpdFontFamily::BOLD);
+    y += locH + 4;
+
+    const int boxX = margin;
+    const int boxW = pageWidth - 2 * margin;
+
+    for (const auto* e : allDayEvents) {
+      if (y > pageHeight - margin - lineH) break;
+
+      const int itemH = lineH + (e->location.empty() ? 0 : locH) + 6;
+      renderer.drawRect(boxX, y, boxW, itemH, true);
+      renderer.drawText(UI_10_FONT_ID, boxX + 8, y + 4, e->title.c_str(), true);
+      if (!e->location.empty()) {
+        renderer.drawText(SMALL_FONT_ID, boxX + 8, y + 4 + lineH, e->location.c_str(), false);
+      }
+      y += itemH + 4;
+    }
+    y += sectionGap;
+  }
+
+  // --- Timeline section ---
+  if (!timedEvents.empty()) {
+    if (y + locH + 4 <= pageHeight - margin) {
+      renderer.drawText(SMALL_FONT_ID, margin, y, "TIMELINE", true, EpdFontFamily::BOLD);
+      y += locH + 4;
+      renderer.drawLine(margin, y, pageWidth - margin, y, true);
+      y += 8;
+    }
+
+    const int timelineX = margin + timeColW;
+    const int timelineEndX = pageWidth - margin;
+
+    for (size_t i = 0; i < timedEvents.size(); i++) {
+      const auto* e = timedEvents[i];
+      if (y > pageHeight - margin - lineH) break;
+
+      const int eventH = lineH + (e->location.empty() ? 0 : locH) + 6;
+
+      // Time label on left
+      renderer.drawText(SMALL_FONT_ID, margin, y + 2, e->startTime.c_str(), true);
+
+      // Timeline connector line
+      renderer.drawLine(timelineX, y + lineH / 2, timelineX + 12, y + lineH / 2, true);
+      renderer.drawLine(timelineX, y, timelineX, y + eventH - 4, true);
+
+      // Event block
+      renderer.drawRect(timelineX + 14, y, timelineEndX - timelineX - 14, eventH, true);
+      renderer.drawText(UI_10_FONT_ID, timelineX + 22, y + 4, e->title.c_str(), true);
+      if (!e->location.empty()) {
+        renderer.drawText(SMALL_FONT_ID, timelineX + 22, y + 4 + lineH, e->location.c_str(), false);
+      }
+
+      y += eventH + 4;
+    }
+  }
 
   if (events.empty()) {
     renderer.drawCenteredText(UI_10_FONT_ID, pageHeight / 2, tr(STR_NO_EVENTS_TODAY));
-    renderer.invertScreen();
-    renderer.displayBuffer(HalDisplay::FULL_REFRESH);
-    return;
-  }
-
-  for (const auto& e : events) {
-    if (y > pageHeight - margin - lineSpacing) break;
-
-    char timeBuf[16];
-    if (e.allDay) {
-      snprintf(timeBuf, sizeof(timeBuf), "all day");
-    } else if (e.endTime.empty()) {
-      snprintf(timeBuf, sizeof(timeBuf), "%s", e.startTime.c_str());
-    } else {
-      snprintf(timeBuf, sizeof(timeBuf), "%s-%s", e.startTime.c_str(), e.endTime.c_str());
-    }
-
-    renderer.drawText(UI_10_FONT_ID, margin, y, timeBuf, true);
-    renderer.drawText(UI_10_FONT_ID, margin + timeColWidth, y, e.title.c_str(), true);
-    y += lineSpacing;
-
-    if (!e.location.empty() && y <= pageHeight - margin - locSpacing) {
-      renderer.drawText(SMALL_FONT_ID, margin + timeColWidth, y, e.location.c_str(), false);
-      y += locSpacing;
-    }
-
-    y += eventGap;
-
-    if (y <= pageHeight - margin - lineSpacing) {
-      renderer.drawLine(margin, y - eventGap / 2, pageWidth - margin, y - eventGap / 2, false);
-    }
   }
 
   renderer.invertScreen();
