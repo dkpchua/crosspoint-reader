@@ -342,14 +342,15 @@ void SleepActivity::renderBlankSleepScreen() const {
 void SleepActivity::renderCalendarSleepScreen() const {
   CALENDAR_STORE.ensureLoaded();
 
+  const auto pageWidth = renderer.getScreenWidth();
   const auto pageHeight = renderer.getScreenHeight();
 
   renderer.clearScreen();
 
   if (!CALENDAR_STORE.hasData()) {
-    renderer.drawCenteredText(UI_12_FONT_ID, pageHeight / 2, tr(STR_CALENDAR_DATA_MISSING), true,
+    renderer.drawCenteredText(UI_12_FONT_ID, pageHeight / 2 - 10, tr(STR_CALENDAR_DATA_MISSING), true,
                               EpdFontFamily::BOLD);
-    renderer.drawCenteredText(SMALL_FONT_ID, pageHeight / 2 + 25, tr(STR_CALENDAR));
+    renderer.drawCenteredText(SMALL_FONT_ID, pageHeight / 2 + 20, tr(STR_CALENDAR));
     renderer.invertScreen();
     renderer.displayBuffer(HalDisplay::HALF_REFRESH);
     return;
@@ -358,10 +359,19 @@ void SleepActivity::renderCalendarSleepScreen() const {
   const auto& events = CALENDAR_STORE.getEvents();
   const auto& date = CALENDAR_STORE.getDate();
 
-  int y = 20;
+  const int margin = 20;
+  const int timeColWidth = 115;
+  const int lineSpacing = 22;
+  const int locSpacing = 16;
+  const int eventGap = 8;
 
-  renderer.drawCenteredText(UI_12_FONT_ID, y, date.c_str(), true, EpdFontFamily::BOLD);
-  y += 30;
+  int y = margin;
+
+  renderer.drawText(UI_12_FONT_ID, margin, y, date.c_str(), true, EpdFontFamily::BOLD);
+  y += renderer.getTextHeight(UI_12_FONT_ID) + 8;
+
+  renderer.drawLine(margin, y, pageWidth - margin, y, true);
+  y += 12;
 
   if (events.empty()) {
     renderer.drawCenteredText(UI_10_FONT_ID, pageHeight / 2, tr(STR_NO_EVENTS_TODAY));
@@ -371,28 +381,31 @@ void SleepActivity::renderCalendarSleepScreen() const {
   }
 
   for (const auto& e : events) {
-    if (y > pageHeight - 30) break;
+    if (y > pageHeight - margin - lineSpacing) break;
 
-    char line[64];
+    char timeBuf[16];
     if (e.allDay) {
-      snprintf(line, sizeof(line), "All day  %s", e.title.c_str());
+      snprintf(timeBuf, sizeof(timeBuf), "all day");
     } else if (e.endTime.empty()) {
-      snprintf(line, sizeof(line), "%s  %s", e.startTime.c_str(), e.title.c_str());
+      snprintf(timeBuf, sizeof(timeBuf), "%s", e.startTime.c_str());
     } else {
-      snprintf(line, sizeof(line), "%s-%s  %s", e.startTime.c_str(), e.endTime.c_str(), e.title.c_str());
+      snprintf(timeBuf, sizeof(timeBuf), "%s-%s", e.startTime.c_str(), e.endTime.c_str());
     }
 
-    renderer.drawText(UI_10_FONT_ID, 10, y, line);
-    y += 20;
+    renderer.drawText(UI_10_FONT_ID, margin, y, timeBuf, true);
+    renderer.drawText(UI_10_FONT_ID, margin + timeColWidth, y, e.title.c_str(), true);
+    y += lineSpacing;
 
-    if (!e.location.empty() && y <= pageHeight - 30) {
-      char locLine[32];
-      snprintf(locLine, sizeof(locLine), "  %s", e.location.c_str());
-      renderer.drawText(SMALL_FONT_ID, 25, y, locLine);
-      y += 15;
+    if (!e.location.empty() && y <= pageHeight - margin - locSpacing) {
+      renderer.drawText(SMALL_FONT_ID, margin + timeColWidth, y, e.location.c_str(), false);
+      y += locSpacing;
     }
 
-    y += 5;
+    y += eventGap;
+
+    if (y <= pageHeight - margin - lineSpacing) {
+      renderer.drawLine(margin, y - eventGap / 2, pageWidth - margin, y - eventGap / 2, false);
+    }
   }
 
   renderer.invertScreen();
