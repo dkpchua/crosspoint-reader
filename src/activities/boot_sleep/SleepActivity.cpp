@@ -347,10 +347,6 @@ void SleepActivity::renderCalendarSleepScreen() const {
 
   renderer.clearScreen();
 
-  // Pre-clear: full refresh an empty screen to flush any residual ghosting
-  renderer.displayBuffer(HalDisplay::FULL_REFRESH);
-  renderer.clearScreen();
-
   if (!CALENDAR_STORE.hasData()) {
     renderer.drawCenteredText(UI_12_FONT_ID, pageHeight / 2 - 10, tr(STR_CALENDAR_DATA_MISSING), true,
                               EpdFontFamily::BOLD);

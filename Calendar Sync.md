@@ -121,14 +121,14 @@ struct CalendarEvent {
 
 **Key methods**:
 - `parseFromJson(const char* json)` — Parses JSON, populates `events` vector (max 20), truncates strings. Returns `true` on success.
-- `saveToFile()` — Serializes to JSON, writes to `/.crosspoint/calendar.tmp`, then renames to `/.crosspoint/calendar.json` (atomic write). Returns `true` on success.
+- `saveToFile()` — Serializes to JSON and writes directly to `/.crosspoint/calendar.json`. Returns `true` on success.
 - `loadFromFile()` — Reads `/.crosspoint/calendar.json` from SD card and parses it. Sets `loaded = true` regardless of result.
 - `ensureLoaded()` — Calls `loadFromFile()` once if not already loaded (lazy loading).
 - `clear()` — Clears in-memory data and deletes the SD card file.
 - `hasData()` — Returns `true` if events vector is non-empty or date string is set.
 - `getEvents()` / `getDate()` — Const accessors for rendering.
 
-**SD card file**: `/.crosspoint/calendar.json` (atomic write via temp file + rename).
+**SD card file**: `/.crosspoint/calendar.json` (direct write, no temp file).
 
 ### 2.3 Sleep Screen Rendering
 
@@ -138,19 +138,38 @@ The renderer:
 1. Calls `CALENDAR_STORE.ensureLoaded()` (lazy-loads from SD card on first render)
 2. Clears the screen
 3. If no data exists: shows "No calendar data" centered, with "Calendar" subtitle
-4. If data exists: renders the `date` string as a bold header at the top
-5. If events list is empty: shows "No events today" centered
-6. Otherwise: lists events top-to-bottom:
-   - All-day events: `All day  <title>`
-   - Timed events with end time: `HH:MM-HH:MM  <title>`
-   - Timed events without end time: `HH:MM  <title>`
-   - Location (if present) in smaller text below the event line
-   - Stops rendering when `y > pageHeight - 30` (prevents overflow)
-7. Calls `renderer.invertScreen()` + `renderer.displayBuffer(HalDisplay::HALF_REFRESH)`
+4. If data exists: parses the date string to "WEEKDAY, D MONTH YYYY" format using Zeller's congruence
+5. Renders the date as a bold header with a separator line
+6. Separates events into **all-day** and **timed** groups:
+   - **ALL-DAY section**: Section label, then each event in a bordered box with title + optional location
+   - **TIMELINE section**: Section label with separator line, then each timed event with:
+     - Time label on the left (e.g. "16:00")
+     - Vertical timeline connector line
+     - Horizontal connector to a bordered event box containing title + optional location
+7. If events list is empty: shows "No events today" centered
+8. Calls `renderer.invertScreen()` + `renderer.displayBuffer(HalDisplay::FULL_REFRESH)`
 
-**Fonts used**: `UI_12_FONT_ID` (header), `UI_10_FONT_ID` (event lines), `SMALL_FONT_ID` (location).
+**Layout details**:
+- Date header: `WEDNESDAY, 1 JULY 2026` in `UI_12_FONT_ID` (bold)
+- Section labels: "ALL-DAY" and "TIMELINE" in `SMALL_FONT_ID` (bold)
+- Event titles: `UI_10_FONT_ID`
+- Locations: `SMALL_FONT_ID` (dimmed)
+- Margins: 20px on all sides
+- Time column width: 60px
+- Event boxes: Bordered rectangles with 8px internal padding
+- Timeline connectors: Vertical line from time column to event box, with horizontal connector
 
-### 2.4 SLEEP_SCREEN_MODE Enum Values
+**Refresh behavior**: Uses `FULL_REFRESH` to prevent ghosting from previous screens (e.g., firmware update progress). The custom bitmap sleep screen uses `HALF_REFRESH` because it fills every pixel, while the calendar screen has large empty areas that benefit from a full refresh cycle.
+
+### 2.4 Ghosting Prevention
+
+The calendar sleep screen had ghosting issues when displayed after firmware update screens. Two fixes were implemented:
+
+1. **Firmware update SUCCESS state** (`SdFirmwareUpdateActivity.cpp`): Changed from `HALF_REFRESH` to `FULL_REFRESH` for the final success screen. This ensures the e-ink panel is in a clean state before the device restarts, preventing deep ghosting from the repeated fast refreshes during the progress bar updates.
+
+2. **Calendar sleep screen**: Removed a double full refresh pre-clear step that was actually causing ghosting. The calendar now does a single `FULL_REFRESH` like the custom bitmap sleep screen, avoiding residual charge from rapid successive refreshes.
+
+### 2.5 SLEEP_SCREEN_MODE Enum Values
 
 ```cpp
 enum SLEEP_SCREEN_MODE {
@@ -166,7 +185,7 @@ enum SLEEP_SCREEN_MODE {
 };
 ```
 
-### 2.5 I18n Strings
+### 2.6 I18n Strings
 
 | String ID | English Text |
 |-----------|-------------|
@@ -174,7 +193,7 @@ enum SLEEP_SCREEN_MODE {
 | `STR_NO_EVENTS_TODAY` | "No events today" |
 | `STR_CALENDAR_DATA_MISSING` | "No calendar data" |
 
-### 2.6 Web Settings Page
+### 2.7 Web Settings Page
 
 The Settings page (`/settings`) now includes a **Calendar Sync** card with:
 - A textarea for pasting/editing calendar JSON
