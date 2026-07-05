@@ -417,11 +417,11 @@ void SleepActivity::renderCalendarSleepScreen() const {
     for (const auto* e : allDayEvents) {
       if (y > pageHeight - margin - lineH) break;
 
-      const int itemH = lineH + (e->location.empty() ? 0 : locH) + 6;
+      const int itemH = lineH + (e->location.empty() ? 0 : locH) + 12;
       renderer.drawRect(boxX, y, boxW, itemH, true);
-      renderer.drawText(UI_10_FONT_ID, boxX + 8, y + 4, e->title.c_str(), true);
+      renderer.drawText(UI_10_FONT_ID, boxX + 8, y + 5, e->title.c_str(), true);
       if (!e->location.empty()) {
-        renderer.drawText(SMALL_FONT_ID, boxX + 8, y + 4 + lineH, e->location.c_str(), false);
+        renderer.drawText(SMALL_FONT_ID, boxX + 8, y + 5 + lineH, e->location.c_str(), false);
       }
       y += itemH + 4;
     }
@@ -444,20 +444,21 @@ void SleepActivity::renderCalendarSleepScreen() const {
       const auto* e = timedEvents[i];
       if (y > pageHeight - margin - lineH) break;
 
-      const int eventH = lineH + (e->location.empty() ? 0 : locH) + 6;
+      const int eventH = lineH + (e->location.empty() ? 0 : locH) + 12;
+      const int textTopOffset = (eventH - lineH) / 2;
 
       // Time label on left
-      renderer.drawText(SMALL_FONT_ID, margin, y + 2, e->startTime.c_str(), true);
+      renderer.drawText(SMALL_FONT_ID, margin, y + textTopOffset, e->startTime.c_str(), true);
 
       // Timeline connector line
-      renderer.drawLine(timelineX, y + lineH / 2, timelineX + 12, y + lineH / 2, true);
+      renderer.drawLine(timelineX, y + eventH / 2, timelineX + 12, y + eventH / 2, true);
       renderer.drawLine(timelineX, y, timelineX, y + eventH - 4, true);
 
       // Event block
       renderer.drawRect(timelineX + 14, y, timelineEndX - timelineX - 14, eventH, true);
-      renderer.drawText(UI_10_FONT_ID, timelineX + 22, y + 6, e->title.c_str(), true);
+      renderer.drawText(UI_10_FONT_ID, timelineX + 22, y + textTopOffset, e->title.c_str(), true);
       if (!e->location.empty()) {
-        renderer.drawText(SMALL_FONT_ID, timelineX + 22, y + 6 + lineH, e->location.c_str(), false);
+        renderer.drawText(SMALL_FONT_ID, timelineX + 22, y + textTopOffset + lineH, e->location.c_str(), false);
       }
 
       y += eventH + 4;
