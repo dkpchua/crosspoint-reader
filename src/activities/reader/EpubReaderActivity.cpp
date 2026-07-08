@@ -1027,8 +1027,9 @@ void EpubReaderActivity::renderContents(std::unique_ptr<Page> page, const int or
   const auto tPrewarm = millis();
 
   const bool pageHasImages = page->hasImages();
-  const bool needsTextGrayscale = SETTINGS.textAntiAliasing;
-  const bool needsAnyGrayscale = needsTextGrayscale || pageHasImages;
+  const bool invertedMode = SETTINGS.displayMode == CrossPointSettings::DISPLAY_INVERTED;
+  const bool needsTextGrayscale = SETTINGS.textAntiAliasing && !invertedMode;
+  const bool needsAnyGrayscale = (needsTextGrayscale || pageHasImages) && !invertedMode;
   auto renderGrayscalePass = [&]() {
     if (needsTextGrayscale) {
       page->render(renderer, fontId, orientedMarginLeft, orientedMarginTop);
@@ -1039,6 +1040,7 @@ void EpubReaderActivity::renderContents(std::unique_ptr<Page> page, const int or
 
   page->render(renderer, fontId, orientedMarginLeft, orientedMarginTop);
   renderStatusBar();
+  if (invertedMode) renderer.invertScreen();
   const auto tBwRender = millis();
 
   if (pageHasImages) {
@@ -1048,7 +1050,7 @@ void EpubReaderActivity::renderContents(std::unique_ptr<Page> page, const int or
     // Step 1: Display page with image area blanked (text appears, image area white)
     // Step 2: Re-render with images and display again (images appear clean)
     int16_t imgX, imgY, imgW, imgH;
-    if (page->getImageBoundingBox(imgX, imgY, imgW, imgH)) {
+    if (!invertedMode && page->getImageBoundingBox(imgX, imgY, imgW, imgH)) {
       renderer.fillRect(imgX + orientedMarginLeft, imgY + orientedMarginTop, imgW, imgH, false);
       renderer.displayBuffer(HalDisplay::FAST_REFRESH);
 

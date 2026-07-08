@@ -404,9 +404,10 @@ void TxtReaderActivity::renderPage() {
   renderLines();
   renderStatusBar();
 
+  if (SETTINGS.displayMode == CrossPointSettings::DISPLAY_INVERTED) renderer.invertScreen();
   ReaderUtils::displayWithRefreshCycle(renderer, pagesUntilFullRefresh);
 
-  if (SETTINGS.textAntiAliasing) {
+  if (SETTINGS.textAntiAliasing && SETTINGS.displayMode != CrossPointSettings::DISPLAY_INVERTED) {
     ReaderUtils::renderAntiAliased(renderer, [&renderLines]() { renderLines(); });
   }
   // scope destructor clears font cache via FontCacheManager

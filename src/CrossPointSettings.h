@@ -175,6 +175,9 @@ class CrossPointSettings {
     QUICK_RESUME_SLEEP_SCREEN_COUNT
   };
 
+  // Reader display mode: Normal (black text on white) or Inverted (white text on black)
+  enum DISPLAY_MODE { DISPLAY_NORMAL = 0, DISPLAY_INVERTED = 1, DISPLAY_MODE_COUNT };
+
   // Sleep screen settings
   uint8_t sleepScreen = DARK;
   // Sleep screen cover mode settings
@@ -269,6 +272,8 @@ class CrossPointSettings {
   uint8_t language = 0;
   // Quick Resume: keep current content visible with moon icon instead of showing a static sleep screen.
   uint8_t quickResumeSleepScreen = QUICK_RESUME_NEVER;
+  // Reader display mode: Normal (black text on white) or Inverted (white text on black)
+  uint8_t displayMode = DISPLAY_NORMAL;
 
   ~CrossPointSettings() = default;
 
