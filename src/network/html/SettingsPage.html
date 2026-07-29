@@ -836,18 +836,26 @@
     const container = document.getElementById('calendar-container');
     let html = '<div class="card"><h2>Calendar Sync</h2>';
     html += '<p style="color:var(--label-color);font-size:0.9em;margin-bottom:12px;">' +
-      'Push today\u2019s calendar events to display on the sleep screen. ' +
-      'Set Sleep Screen to \u201CCalendar\u201D in Display settings above.' +
+      'Push calendar events to display on the sleep screen. ' +
+      'Set Sleep Screen to \u201CCalendar\u201D in Display settings above. ' +
+      'Supports multiple dates with clear segmentation.' +
       '</p>';
     html += '<div class="setting-row" style="align-items:flex-start;">' +
       '<span class="setting-name">Calendar JSON</span>' +
-      '<span class="setting-control"><textarea id="calendar-json" rows="10" ' +
+      '<span class="setting-control"><textarea id="calendar-json" rows="12" ' +
       'style="width:320px;font-family:monospace;font-size:0.85em;padding:6px 10px;border:1px solid #ddd;border-radius:4px;background:var(--card-bg);"' +
-      ' placeholder=\'{"date":"2026-07-01","events":[{"start":"09:00","end":"10:30","title":"Project Sync","location":"Room A"}]}\'></textarea></span>' +
+      ' placeholder=\'{"events":[{"date":"2026-07-09","start":"09:00","end":"10:30","title":"Morning Meeting","location":"Conference Room"},{"date":"2026-07-09","all_day":true,"title":"Company Holiday"},{"date":"2026-07-10","start":"14:00","title":"Project Review"}]}\'></textarea></span>' +
+      '</div>';
+    html += '<div style="margin:8px 0;padding:8px;background:var(--code-bg);border-radius:4px;font-size:0.8em;">' +
+      '<strong>Format:</strong> Each event needs a "date" field (YYYY-MM-DD).<br>' +
+      '<strong>Time:</strong> "start"/"end" in 24h format (e.g., "09:00", "14:30").<br>' +
+      '<strong>All-day:</strong> Set "all_day":true, omit time fields.<br>' +
+      '<strong>Optional:</strong> "location" field for venue information.' +
       '</div>';
     html += '<div class="opds-actions">' +
       '<button class="btn-small btn-save-server" onclick="pushCalendar()">Push Calendar</button>' +
       '<button class="btn-small btn-delete" onclick="clearCalendar()">Clear Calendar Data</button>' +
+      '<button class="btn-small" onclick="loadExample()">Load Example</button>' +
       '</div>';
     html += '</div>';
     container.innerHTML = html;
@@ -896,6 +904,55 @@
     } catch (e) {
       showMessage('Error: ' + e.message, true);
     }
+  }
+
+  function loadExample() {
+    const example = {
+      "events": [
+        {
+          "date": "2026-07-09",
+          "start": "09:00",
+          "end": "10:30",
+          "title": "Morning Meeting",
+          "location": "Conference Room A"
+        },
+        {
+          "date": "2026-07-09",
+          "all_day": true,
+          "title": "Company Holiday",
+          "location": "Office"
+        },
+        {
+          "date": "2026-07-09",
+          "start": "14:00",
+          "end": "15:30",
+          "title": "Project Review",
+          "location": "Meeting Room 3"
+        },
+        {
+          "date": "2026-07-10",
+          "start": "11:00",
+          "end": "12:00",
+          "title": "Client Call",
+          "location": "Virtual"
+        },
+        {
+          "date": "2026-07-10",
+          "start": "15:00",
+          "end": "16:30",
+          "title": "Team Workshop",
+          "location": "Training Center"
+        },
+        {
+          "date": "2026-07-11",
+          "all_day": true,
+          "title": "Travel Day",
+          "location": "Airport"
+        }
+      ]
+    };
+    document.getElementById('calendar-json').value = JSON.stringify(example, null, 2);
+    showMessage('Example calendar loaded. Review and click "Push Calendar" to send to device.', false);
   }
 </script>
 </body>

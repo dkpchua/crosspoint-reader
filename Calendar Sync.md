@@ -2,9 +2,11 @@
 
 ## Overview
 
-The Calendar Sleep Screen is a firmware feature that displays today's calendar events on the e-ink sleep screen. Calendar data is pushed to the reader via HTTP POST during an active Wi-Fi session — the same session users already open to transfer books. No background connectivity, no BLE, no dedicated app page.
+The Calendar Sleep Screen is a firmware feature that displays calendar events on the e-ink sleep screen with support for multiple dates and clear visual segmentation. Calendar data is pushed to the reader via HTTP POST during an active Wi-Fi session — the same session users already open to transfer books. No background connectivity, no BLE, no dedicated app page.
 
 This document describes the **actual implementation** and provides an **integration guide for companion apps** (e.g., the iOS app).
+
+**NEW: Multi-Date Support** - The calendar now supports events across multiple dates with clear visual separation, making it much easier to read upcoming events.
 
 ---
 
@@ -18,18 +20,30 @@ Pushes calendar events to the reader. The firmware parses the JSON, stores it in
 
 ```json
 {
-  "date": "2026-07-01",
   "events": [
     {
+      "date": "2026-07-09",
       "start": "09:00",
       "end": "10:30",
-      "title": "Project Sync",
-      "location": "Meeting Room A"
+      "title": "Morning Meeting",
+      "location": "Conference Room A"
     },
     {
+      "date": "2026-07-09",
+      "all_day": true,
+      "title": "Company Holiday",
+      "location": "Office"
+    },
+    {
+      "date": "2026-07-10",
       "start": "14:00",
-      "title": "Lunch with Team",
-      "all_day": true
+      "title": "Project Review"
+    },
+    {
+      "date": "2026-07-11",
+      "all_day": true,
+      "title": "Travel Day",
+      "location": "Airport"
     }
   ]
 }
@@ -39,13 +53,15 @@ Pushes calendar events to the reader. The firmware parses the JSON, stores it in
 
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
-| `date` | string | No | Date of the events, format `YYYY-MM-DD`. Displayed as the header on the sleep screen. |
 | `events` | array | No | Array of event objects (max 20; excess events are silently dropped). |
-| `events[].start` | string | Yes | Start time, format `HH:MM` (24-hour). |
+| `events[].date` | string | **Yes** | Date of the event, format `YYYY-MM-DD`. **Required for each event**. |
+| `events[].start` | string | No | Start time, format `HH:MM` (24-hour). Omit for all-day events. |
 | `events[].end` | string | No | End time, format `HH:MM`. Omit or leave empty for no end time. |
-| `events[].title` | string | Yes | Event title. Truncated to 30 characters. |
+| `events[].title` | string | **Yes** | Event title. Truncated to 30 characters. |
 | `events[].location` | string | No | Event location. Truncated to 20 characters. |
 | `events[].all_day` | boolean | No | If `true`, event is shown as "All day" instead of a time range. |
+
+**⚠️ Breaking Change**: The `date` field is now **required for each event** instead of a single top-level date. This enables multi-date support.
 
 **Responses**:
 
@@ -60,7 +76,7 @@ Pushes calendar events to the reader. The firmware parses the JSON, stores it in
 ```bash
 curl -X POST http://<reader-ip>/api/calendar/update \
   -H "Content-Type: application/json" \
-  -d '{"date":"2026-07-01","events":[{"start":"09:00","end":"10:30","title":"Project Sync","location":"Room A"}]}'
+  -d '{"events":[{"date":"2026-07-09","start":"09:00","end":"10:30","title":"Morning Meeting","location":"Conference Room A"},{"date":"2026-07-09","all_day":true,"title":"Company Holiday"},{"date":"2026-07-10","start":"14:00","title":"Project Review"}]}'
 ```
 
 ### POST /api/calendar/clear
@@ -111,6 +127,7 @@ Where `7` = `CALENDAR` in the `SLEEP_SCREEN_MODE` enum. See the full enum values
 
 ```cpp
 struct CalendarEvent {
+  std::string date;        // "YYYY-MM-DD" - NEW: Required for each event
   std::string startTime;   // "HH:MM"
   std::string endTime;     // "HH:MM" (empty if none)
   std::string title;       // Max 30 characters (truncated on parse)
@@ -125,8 +142,10 @@ struct CalendarEvent {
 - `loadFromFile()` — Reads `/.crosspoint/calendar.json` from SD card and parses it. Sets `loaded = true` regardless of result.
 - `ensureLoaded()` — Calls `loadFromFile()` once if not already loaded (lazy loading).
 - `clear()` — Clears in-memory data and deletes the SD card file.
-- `hasData()` — Returns `true` if events vector is non-empty or date string is set.
-- `getEvents()` / `getDate()` — Const accessors for rendering.
+- `hasData()` — Returns `true` if events vector is non-empty.
+- `getEvents()` — Const accessor for all events.
+- `getUniqueDates()` — **NEW**: Returns vector of unique dates from all events.
+- `getEventsForDate(const std::string& date)` — **NEW**: Returns events for a specific date.
 
 **SD card file**: `/.crosspoint/calendar.json` (direct write, no temp file).
 
@@ -138,16 +157,18 @@ The renderer:
 1. Calls `CALENDAR_STORE.ensureLoaded()` (lazy-loads from SD card on first render)
 2. Clears the screen
 3. If no data exists: shows "No calendar data" centered, with "Calendar" subtitle
-4. If data exists: parses the date string to "WEEKDAY, D MONTH YYYY" format using Zeller's congruence
-5. Renders the date as a bold header with a separator line
-6. Separates events into **all-day** and **timed** groups:
-   - **ALL-DAY section**: Section label, then each event in a bordered box with title + optional location
-   - **TIMELINE section**: Section label with separator line, then each timed event with:
-     - Time label on the left (e.g. "16:00")
-     - Vertical timeline connector line
-     - Horizontal connector to a bordered event box containing title + optional location
-7. If events list is empty: shows "No events today" centered
-8. Calls `renderer.invertScreen()` + `renderer.displayBuffer(HalDisplay::FULL_REFRESH)`
+4. If data exists: gets unique dates and renders each date section:
+   - **Date header**: Parses each date to "WEEKDAY, D MONTH YYYY" format using Zeller's congruence
+   - **Date separator**: Bold header with underline for each date
+   - **Event grouping**: For each date, separates events into **all-day** and **timed** groups:
+     - **ALL-DAY section**: Section label, then each event in a bordered box with title + optional location
+     - **TIMELINE section**: Section label with separator line, then each timed event with:
+       - Time label on the left (e.g. "16:00")
+       - Vertical timeline connector line
+       - Horizontal connector to a bordered event box containing title + optional location
+   - **Date separators**: Visual dotted lines between different date sections
+5. If no events exist: shows "No events today" centered
+6. Calls `renderer.invertScreen()` + `renderer.displayBuffer(HalDisplay::HALF_REFRESH)`
 
 **Layout details**:
 - Date header: `WEDNESDAY, 1 JULY 2026` in `UI_12_FONT_ID` (bold)
@@ -159,7 +180,7 @@ The renderer:
 - Event boxes: Bordered rectangles with 8px internal padding
 - Timeline connectors: Vertical line from time column to event box, with horizontal connector
 
-**Refresh behavior**: Uses `FULL_REFRESH` to prevent ghosting from previous screens (e.g., firmware update progress). The custom bitmap sleep screen uses `HALF_REFRESH` because it fills every pixel, while the calendar screen has large empty areas that benefit from a full refresh cycle.
+**Refresh behavior**: Uses `HALF_REFRESH` for optimal performance. The calendar screen fills most pixels with content and inverted background, making half refresh sufficient while avoiding ghosting. The custom bitmap sleep screen also uses `HALF_REFRESH`.
 
 ### 2.4 Ghosting Prevention
 
@@ -236,13 +257,16 @@ The iOS app can push calendar data to the reader during a Wi-Fi session. The rea
 ```swift
 import EventKit
 
-func pushCalendarEvents(to readerURL: URL, events: [EKEvent], date: String) async throws {
-    // Convert EKEvent array to the reader's JSON format
+func pushCalendarEvents(to readerURL: URL, events: [EKEvent], dateRange: ClosedRange<Date>) async throws {
+    // Convert EKEvent array to the reader's multi-date JSON format
     let calendarEvents = events.prefix(20).map { event -> [String: Any] in
         var dict: [String: Any] = [:]
-        dict["start"] = formatTime(event.startDate)      // "HH:MM"
-        if event.endDate != event.startDate {
-            dict["end"] = formatTime(event.endDate)        // "HH:MM"
+        dict["date"] = formatDate(event.startDate)    // "YYYY-MM-DD" - REQUIRED for each event
+        if !event.isAllDay {
+            dict["start"] = formatTime(event.startDate)      // "HH:MM"
+            if event.endDate != event.startDate {
+                dict["end"] = formatTime(event.endDate)        // "HH:MM"
+            }
         }
         dict["title"] = String(event.title.prefix(30))
         if let location = event.location, !location.isEmpty {
@@ -255,7 +279,6 @@ func pushCalendarEvents(to readerURL: URL, events: [EKEvent], date: String) asyn
     }
 
     let payload: [String: Any] = [
-        "date": date,           // "YYYY-MM-DD"
         "events": calendarEvents
     ]
 
@@ -270,12 +293,20 @@ func pushCalendarEvents(to readerURL: URL, events: [EKEvent], date: String) asyn
     }
 }
 
+func formatDate(_ date: Date) -> String {
+    let formatter = DateFormatter()
+    formatter.dateFormat = "yyyy-MM-dd"
+    return formatter.string(from: date)
+}
+
 func formatTime(_ date: Date) -> String {
     let formatter = DateFormatter()
     formatter.dateFormat = "HH:mm"
     return formatter.string(from: date)
 }
 ```
+
+**⚠️ Breaking Change**: Each event now requires a `date` field. Use `formatDate()` to convert `Date` to "YYYY-MM-DD" format.
 
 ### 4.2 Clear Calendar Data
 
@@ -316,10 +347,10 @@ func setSleepScreenToCalendar(on readerURL: URL) async throws {
 
 1. **User opens Wi-Fi session** with the reader (existing flow for book transfer)
 2. **App requests calendar access** (EventKit authorization)
-3. **App fetches today's events** from `EKEventStore`
-4. **App pushes events** via `POST /api/calendar/update`
+3. **App fetches events for multiple dates** from `EKEventStore` (e.g., today + next 3 days)
+4. **App pushes multi-date events** via `POST /api/calendar/update`
 5. **App optionally sets sleep screen mode** to Calendar via `POST /api/settings`
-6. **User sees events on sleep screen** — no further action needed
+6. **User sees segmented events on sleep screen** — organized by date with clear visual separation
 7. On next Wi-Fi session, the app can re-push fresh data
 
 ### 4.5 Data Freshness
@@ -328,7 +359,7 @@ The reader has no auto-sync. Calendar data persists across reboots until:
 - The app pushes new data (`POST /api/calendar/update`)
 - The user clears data (`POST /api/calendar/clear` or via the web Settings page)
 
-The app should push fresh data each time the user connects via Wi-Fi. The `date` field in the payload is displayed on the sleep screen so the user can see when the data was last synced.
+The app should push fresh data each time the user connects via Wi-Fi. Each event's `date` field is displayed as a header on the sleep screen, so users can see events for multiple dates and identify when data was last synced.
 
 ---
 
@@ -347,10 +378,10 @@ The app should push fresh data each time the user connects via Wi-Fi. The `date`
 ### Manual Testing via curl
 
 ```bash
-# Push calendar data
+# Push multi-date calendar data
 curl -X POST http://<reader-ip>/api/calendar/update \
   -H "Content-Type: application/json" \
-  -d '{"date":"2026-07-01","events":[{"start":"09:00","end":"10:30","title":"Project Sync","location":"Room A"},{"start":"14:00","title":"Lunch","all_day":false}]}'
+  -d '{"events":[{"date":"2026-07-09","start":"09:00","end":"10:30","title":"Morning Meeting","location":"Conference Room A"},{"date":"2026-07-09","all_day":true,"title":"Company Holiday"},{"date":"2026-07-10","start":"14:00","title":"Project Review"},{"date":"2026-07-11","all_day":true,"title":"Travel Day","location":"Airport"}]}'
 
 # Verify sleep screen shows calendar (set mode to Calendar)
 curl -X POST http://<reader-ip>/api/settings \
@@ -365,18 +396,21 @@ curl -X POST http://<reader-ip>/api/calendar/clear
 
 1. Open `http://<reader-ip>/settings` in a browser
 2. Scroll to the **Calendar Sync** card
-3. Paste calendar JSON into the textarea
-4. Click **Push Calendar** — should show "Calendar data pushed successfully!"
-5. Set Sleep Screen to "Calendar" in the Display settings section
-6. Click **Save Settings**
-7. Put the device to sleep — verify calendar events are displayed
+3. Click **Load Example** to see the new multi-date JSON format
+4. Modify or paste your own multi-date calendar JSON into the textarea
+5. Click **Push Calendar** — should show "Calendar data pushed successfully!"
+6. Set Sleep Screen to "Calendar" in the Display settings section
+7. Click **Save Settings**
+8. Put the device to sleep — verify events are displayed with clear date segmentation and visual separators
 
 ---
 
 ## 7. Future Considerations
 
-- **Multi-day view**: Would require a dedicated page (out of scope)
+- **✅ Multi-day view**: **COMPLETED** - Now supports events across multiple dates with clear visual segmentation
 - **BLE transport**: Would require new BLE infrastructure (out of scope)
 - **Auto-sync**: Would require background Wi-Fi (out of scope)
 - **Direct CalDAV**: Device fetching calendar directly (out of scope)
 - **Two-way sync**: Creating/editing events from the reader (out of scope)
+- **Event limits**: Current limit of 20 events total - consider increasing for multi-date scenarios
+- **Date range limits**: Consider adding configurable date range limits for iOS app integration

@@ -5,7 +5,6 @@ CalendarStore CalendarStore::instance;
 bool CalendarStore::loadFromFile() {
   loaded = true;
   events.clear();
-  date.clear();
 
   if (!Storage.exists(CALENDAR_FILE)) {
     return false;
@@ -29,11 +28,11 @@ String CalendarStore::saveToFile() const {
   Storage.mkdir("/.crosspoint");
 
   JsonDocument doc;
-  doc["date"] = date;
 
   JsonArray eventsArr = doc["events"].to<JsonArray>();
   for (const auto& e : events) {
     JsonObject obj = eventsArr.add<JsonObject>();
+    obj["date"] = e.date;
     obj["start"] = e.startTime;
     if (!e.endTime.empty()) {
       obj["end"] = e.endTime;
@@ -57,13 +56,12 @@ String CalendarStore::saveToFile() const {
     return "SD write failed (path=" + String(CALENDAR_FILE) + ", bytes=" + String(output.length()) + ")";
   }
 
-  LOG_DBG("CAL", "Calendar saved: %zu events for %s", events.size(), date.c_str());
+  LOG_DBG("CAL", "Calendar saved: %zu events across %zu dates", events.size(), getUniqueDates().size());
   return "";
 }
 
 void CalendarStore::clear() {
   events.clear();
-  date.clear();
   Storage.remove(CALENDAR_FILE);
   LOG_DBG("CAL", "Calendar data cleared");
 }
@@ -77,12 +75,6 @@ bool CalendarStore::parseFromJson(const char* json) {
   }
 
   events.clear();
-  date.clear();
-
-  const char* d = doc["date"];
-  if (d) {
-    date = d;
-  }
 
   JsonArray eventsArr = doc["events"].as<JsonArray>();
   if (eventsArr.isNull()) {
@@ -96,6 +88,8 @@ bool CalendarStore::parseFromJson(const char* json) {
     }
 
     CalendarEvent e;
+    const char* date = obj["date"];
+    e.date = date ? date : "";
     const char* start = obj["start"];
     e.startTime = start ? start : "";
     const char* end = obj["end"];
@@ -112,6 +106,28 @@ bool CalendarStore::parseFromJson(const char* json) {
     events.push_back(std::move(e));
   }
 
-  LOG_DBG("CAL", "Parsed %zu events for %s", events.size(), date.c_str());
+  LOG_DBG("CAL", "Parsed %zu events across %zu dates", events.size(), getUniqueDates().size());
   return true;
+}
+
+std::vector<std::string> CalendarStore::getUniqueDates() const {
+  std::vector<std::string> uniqueDates;
+  for (const auto& event : events) {
+    if (!event.date.empty()) {
+      if (std::find(uniqueDates.begin(), uniqueDates.end(), event.date) == uniqueDates.end()) {
+        uniqueDates.push_back(event.date);
+      }
+    }
+  }
+  return uniqueDates;
+}
+
+std::vector<CalendarEvent> CalendarStore::getEventsForDate(const std::string& date) const {
+  std::vector<CalendarEvent> dateEvents;
+  for (const auto& event : events) {
+    if (event.date == date) {
+      dateEvents.push_back(event);
+    }
+  }
+  return dateEvents;
 }

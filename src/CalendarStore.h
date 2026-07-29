@@ -4,11 +4,13 @@
 #include <HalStorage.h>
 #include <Logging.h>
 
+#include <algorithm>
 #include <cstring>
 #include <string>
 #include <vector>
 
 struct CalendarEvent {
+  std::string date;
   std::string startTime;
   std::string endTime;
   std::string title;
@@ -20,7 +22,6 @@ class CalendarStore {
  private:
   static CalendarStore instance;
   std::vector<CalendarEvent> events;
-  std::string date;
   bool loaded = false;
 
   static constexpr size_t MAX_EVENTS = 20;
@@ -48,8 +49,9 @@ class CalendarStore {
   bool parseFromJson(const char* json);
 
   const std::vector<CalendarEvent>& getEvents() const { return events; }
-  const std::string& getDate() const { return date; }
-  bool hasData() const { return !events.empty() || !date.empty(); }
+  std::vector<std::string> getUniqueDates() const;
+  std::vector<CalendarEvent> getEventsForDate(const std::string& date) const;
+  bool hasData() const { return !events.empty(); }
   bool isLoaded() const { return loaded; }
 
   void ensureLoaded() {

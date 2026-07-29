@@ -1934,8 +1934,8 @@ void CrossPointWebServer::handleCalendarUpdate() {
     return;
   }
 
-  LOG_DBG("WEB", "Calendar parsed: %zu events for %s, saving to SD...",
-          CALENDAR_STORE.getEvents().size(), CALENDAR_STORE.getDate().c_str());
+  LOG_DBG("WEB", "Calendar parsed: %zu events across %zu dates, saving to SD...",
+          CALENDAR_STORE.getEvents().size(), CALENDAR_STORE.getUniqueDates().size());
 
   const String saveError = CALENDAR_STORE.saveToFile();
   if (!saveError.isEmpty()) {
@@ -1944,8 +1944,8 @@ void CrossPointWebServer::handleCalendarUpdate() {
     return;
   }
 
-  LOG_DBG("WEB", "Calendar updated: %zu events for %s", CALENDAR_STORE.getEvents().size(),
-          CALENDAR_STORE.getDate().c_str());
+  LOG_DBG("WEB", "Calendar updated: %zu events across %zu dates", CALENDAR_STORE.getEvents().size(),
+          CALENDAR_STORE.getUniqueDates().size());
   server->send(200, "text/plain", "OK");
 }
 
